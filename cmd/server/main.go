@@ -46,7 +46,9 @@ func main() {
 	h := handler.NewHandler(cfg, st)
 
 	app := fiber.New(fiber.Config{
-		AppName: "Email Campaign Sender",
+		AppName:     "Email Campaign Sender",
+		ReadTimeout: 10 * 60 * time.Second,
+		BodyLimit:   1024 * 1024 * 1024, // 1GB
 	})
 
 	devMode := os.Getenv("DEV_MODE") == "true"
