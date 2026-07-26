@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -99,11 +101,34 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	slog.Info("starting server", "addr", addr)
+
+	if !devMode {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			openBrowser(fmt.Sprintf("http://localhost:%d", cfg.Server.Port))
+		}()
+	}
+
 	if err := app.Listen(addr, fiber.ListenConfig{
 		DisableStartupMessage: true,
 	}); err != nil {
 		slog.Error("server error", "error", err)
 		os.Exit(1)
+	}
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		slog.Debug("failed to open browser", "error", err)
 	}
 }
 
