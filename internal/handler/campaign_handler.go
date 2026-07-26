@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -53,20 +55,24 @@ func (h *Handler) HandleGetConfig(c fiber.Ctx) error {
 }
 
 func (h *Handler) HandlePreview(c fiber.Ctx) error {
-	var req struct {
-		campaign.CampaignRequest
-		Count int `json:"count"`
+	req, csvText, err := parseMultipart(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": err.Error()})
 	}
-	if err := c.Bind().Body(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "invalid request body: " + err.Error()})
+	if csvText == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "csv data is required"})
 	}
-	if req.CSV == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "csv field is required"})
+	req.CSV = csvText
+
+	countStr := c.FormValue("count")
+	count := 5
+	if countStr != "" {
+		if n, err := strconv.Atoi(countStr); err == nil && n > 0 {
+			count = n
+		}
 	}
-	if req.Count <= 0 {
-		req.Count = 5
-	}
-	results, err := campaign.Preview(req.CampaignRequest, req.Count)
+
+	results, err := campaign.Preview(req, count)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": err.Error()})
 	}
@@ -74,16 +80,18 @@ func (h *Handler) HandlePreview(c fiber.Ctx) error {
 }
 
 func (h *Handler) HandleStart(c fiber.Ctx) error {
-	var req campaign.CampaignRequest
-	if err := c.Bind().Body(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "invalid request body: " + err.Error()})
+	req, csvText, err := parseMultipart(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": err.Error()})
 	}
-	if req.CSV == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "csv field is required"})
+	if csvText == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "csv data is required"})
 	}
 	if h.Store.IsRunning() {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "campaign is already running"})
 	}
+	req.CSV = csvText
+
 	logger, err := campaign.NewCampaignLogger(".")
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to create campaign logger: " + err.Error()})
@@ -168,4 +176,60 @@ func (h *Handler) HandleEvents(c fiber.Ctx) error {
 func (h *Handler) HandleReset(c fiber.Ctx) error {
 	h.Store.Reset()
 	return c.JSON(map[string]any{"status": "reset"})
+}
+
+// parseMultipart reads multipart form data and builds a CampaignRequest + CSV text.
+func parseMultipart(c fiber.Ctx) (campaign.CampaignRequest, string, error) {
+	var csvText string
+
+	// Try file upload first
+	file, err := c.FormFile("csv_file")
+	if err == nil {
+		fh, openErr := file.Open()
+		if openErr != nil {
+			return campaign.CampaignRequest{}, "", fmt.Errorf("failed to open uploaded file: %w", openErr)
+		}
+		defer fh.Close()
+		data, readErr := io.ReadAll(fh)
+		if readErr != nil {
+			return campaign.CampaignRequest{}, "", fmt.Errorf("failed to read uploaded file: %w", readErr)
+		}
+		csvText = string(data)
+	} else {
+		// Fallback to text field
+		csvText = c.FormValue("csv_text")
+	}
+
+	smtpPort, _ := strconv.Atoi(c.FormValue("smtp_port"))
+
+	req := campaign.CampaignRequest{
+		Subject:  c.FormValue("subject"),
+		Body:     c.FormValue("body"),
+		To:       c.FormValue("to"),
+		From:     c.FormValue("from"),
+		Provider: c.FormValue("provider"),
+		SMTP: config.SMTPConfig{
+			Host:     c.FormValue("smtp_host"),
+			Port:     smtpPort,
+			Username: c.FormValue("smtp_username"),
+			Password: c.FormValue("smtp_password"),
+			TLS:      c.FormValue("smtp_tls") == "true",
+		},
+		SES: config.SESConfig{
+			Region:          c.FormValue("ses_region"),
+			AccessKeyID:     c.FormValue("ses_access_key_id"),
+			SecretAccessKey: c.FormValue("ses_secret_access_key"),
+		},
+		BackoffBase: c.FormValue("retry_backoff_base"),
+		BackoffMax:  c.FormValue("retry_backoff_max"),
+	}
+
+	if v := c.FormValue("concurrency"); v != "" {
+		req.Concurrency, _ = strconv.Atoi(v)
+	}
+	if v := c.FormValue("max_retries"); v != "" {
+		req.MaxRetries, _ = strconv.Atoi(v)
+	}
+
+	return req, csvText, nil
 }

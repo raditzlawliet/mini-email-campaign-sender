@@ -1,6 +1,7 @@
 <script>
     let {
         csvText = $bindable(""),
+        csvFile = $bindable(null),
         csvHeaders = $bindable([]),
         csvCount = $bindable(0),
         manualMode = $bindable(false),
@@ -13,6 +14,7 @@
 
     function flushCSV() {
         csvText = _csvText;
+        csvFile = null;
         parseLocal(_csvText);
     }
 
@@ -20,17 +22,20 @@
         const file = e.target.files?.[0];
         if (!file) return;
         fileName = file.name;
+        csvFile = file;
+        csvText = "";
+        _csvText = "";
+        // Parse header/count for display
         const reader = new FileReader();
         reader.onload = (ev) => {
-            _csvText = ev.target.result;
-            csvText = _csvText;
-            parseLocal(_csvText);
+            parseLocal(ev.target.result);
         };
         reader.readAsText(file);
     }
 
     function toggleManual() {
         manualMode = !manualMode;
+        csvFile = null;
         if (manualMode) {
             fileName = "";
             _csvText = "";

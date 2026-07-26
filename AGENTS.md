@@ -23,14 +23,14 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/campaign/config` | Return default configuration + current campaign state (session restore) |
-| POST | `/api/campaign/preview` | Parse CSV + render N sample emails |
-| POST | `/api/campaign/start` | Parse CSV + start worker pool |
+| POST | `/api/campaign/preview` | Parse CSV (multipart/form-data) + render N sample emails |
+| POST | `/api/campaign/start` | Parse CSV (multipart/form-data) + start worker pool |
 | POST | `/api/campaign/pause` | Gracefully pause (wait for in-flight send, cancel ctx) |
 | POST | `/api/campaign/resume` | Resume processing pending recipients only |
 | GET | `/api/campaign/events` | SSE stream: pushes progress + log events every 1s |
 | POST | `/api/campaign/reset` | Clear all campaign state (works on paused too) |
 
-Preview and Start accept the full payload: `csv`, `subject`, `body`, `to`, `from`, `provider`, `smtp`, `ses`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`.
+Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`. Preview also accepts `count`.
 
 ## Naming Conventions
 
@@ -73,7 +73,7 @@ frontend/
     lib/
       components/
         CampaignForm.svelte   # orchestrator: state, API calls, progress
-        InputData.svelte      # file picker + manual toggle
+        InputData.svelte      # file picker + manual toggle + multipart file emit
         EmailTemplate.svelte  # To, Subject, Body + body preview modal
         ProviderConfig.svelte # SMTP/SES config, fieldset+label+input
         WorkerConfig.svelte   # concurrency, retries, backoff
@@ -91,6 +91,7 @@ frontend/
 - Pause: cancels context between sends (in-flight email completes gracefully). Resume: `RunPending` processes only `pending` recipients.
 - Unified logging: `Store.LogAndEvent(level, msg)` logs to both `slog` (console) and in-memory events (frontend). `CampaignLogger.Log(level, msg)` writes the same message to a JSON file per run.
 - Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`.
+- CSV upload: large files (100MB+) sent via `multipart/form-data` (`csv_file` field) to `parseMultipart()` in handler. Manual input sent as `csv_text` text field. Avoids JSON body size limits.
 - Test with `testify` (`assert`/`require`), each subtest gets its own `assert.New(t)`.
 - Slices/maps initialized explicitly (never nil).
 - Integration tests use `//go:build integration` + Mailtrap Local.
@@ -98,6 +99,7 @@ frontend/
 ## Svelte 5 Conventions
 
 - **Local state + onblur**: Child components with `$bindable` props use local `$state` copy (`_value`) bound to inputs. Sync to parent only on `onblur` via `flush()`. Avoids INP delays from per-keystroke parent re-renders.
+- **Multipart upload**: CSV file sent via `FormData` (no manual `Content-Type` — browser sets boundary). `csvFile` prop tracked in `InputData`, used by `CampaignForm.buildFormData()` for preview/start.
 - **Form pattern**: `<fieldset class="fieldset">` wrapping `<label class="label" for="id">` + `<input id="..." class="input w-full">`.
 - **Iframe sandbox**: Preview modes use sandboxed iframes with `srcdoc` to isolate email content.
 - **Log panel**: Collapsable below progress, auto-scrolls when scrolled to bottom, shows timestamped events from backend.

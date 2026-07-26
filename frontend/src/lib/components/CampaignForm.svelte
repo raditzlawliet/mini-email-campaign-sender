@@ -13,6 +13,7 @@
 
     // --- Input Data ---
     let csvText = $state("");
+    let csvFile = $state(null);
     let csvHeaders = $state([]);
     let csvCount = $state(0);
     let manualMode = $state(false);
@@ -101,6 +102,15 @@
         if (!res.ok) throw new Error(data.error || res.statusText);
         return data;
     }
+    async function apiPostFormData(path, fd) {
+        const res = await fetch(path, {
+            method: "POST",
+            body: fd,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+    }
 
     async function loadDefaults() {
         loading = true;
@@ -164,40 +174,40 @@
         loadDefaults();
     });
 
-    function buildPayload() {
-        return {
-            csv: csvText,
-            subject,
-            body,
-            to: toField,
-            from: fromEmail,
-            provider,
-            smtp: {
-                Host: smtpHost,
-                Port: parseInt(smtpPort) || 0,
-                Username: smtpUsername,
-                Password: smtpPassword,
-                TLS: smtpTLS,
-            },
-            ses: {
-                Region: sesRegion,
-                AccessKeyID: sesAccessKeyId,
-                SecretAccessKey: sesSecretAccessKey,
-            },
-            concurrency,
-            max_retries: maxRetries,
-            retry_backoff_base: backoffBase,
-            retry_backoff_max: backoffMax,
-        };
+    function buildFormData() {
+        const fd = new FormData();
+        if (!manualMode && csvFile) {
+            fd.append("csv_file", csvFile);
+        } else {
+            fd.append("csv_text", csvText);
+        }
+        fd.append("subject", subject);
+        fd.append("body", body);
+        fd.append("to", toField);
+        fd.append("from", fromEmail);
+        fd.append("provider", provider);
+        fd.append("smtp_host", smtpHost);
+        fd.append("smtp_port", smtpPort);
+        fd.append("smtp_username", smtpUsername);
+        fd.append("smtp_password", smtpPassword);
+        fd.append("smtp_tls", String(smtpTLS));
+        fd.append("ses_region", sesRegion);
+        fd.append("ses_access_key_id", sesAccessKeyId);
+        fd.append("ses_secret_access_key", sesSecretAccessKey);
+        fd.append("concurrency", String(concurrency));
+        fd.append("max_retries", String(maxRetries));
+        fd.append("retry_backoff_base", backoffBase);
+        fd.append("retry_backoff_max", backoffMax);
+        return fd;
     }
 
     async function handlePreview() {
         saving = true;
         error = "";
         try {
-            const payload = buildPayload();
-            payload.count = 5;
-            const data = await apiPost("/api/campaign/preview", payload);
+            const fd = buildFormData();
+            fd.append("count", "5");
+            const data = await apiPostFormData("/api/campaign/preview", fd);
             previews = data.previews || [];
             previewOpen = true;
         } catch (e) {
@@ -227,7 +237,11 @@
     $effect(() => { initSSE(); });
 
     async function handleStart() {
-        if (!csvText.trim()) {
+        if (!manualMode && !csvFile) {
+            error = "Please provide CSV data first.";
+            return;
+        }
+        if (manualMode && !csvText.trim()) {
             error = "Please provide CSV data first.";
             return;
         }
@@ -235,7 +249,7 @@
         error = "";
         logEvents = [];
         try {
-            await apiPost("/api/campaign/start", buildPayload());
+            await apiPostFormData("/api/campaign/start", buildFormData());
             progress.state = "running";
             logOpen = true;
         } catch (e) {
@@ -359,6 +373,7 @@
     {:else}
         <InputData
             bind:csvText
+            bind:csvFile
             bind:csvHeaders
             bind:csvCount
             bind:manualMode
@@ -425,7 +440,7 @@
                     <button
                         class="btn btn-outline"
                         onclick={handlePreview}
-                        disabled={saving || !csvText.trim() || campaignRunning}
+                        disabled={saving || (!manualMode && !csvFile && !csvText.trim()) || campaignRunning}
                     >
                         {#if saving}<span
                                 class="loading loading-spinner loading-xs"
@@ -452,7 +467,7 @@
                     <button
                         class="btn btn-primary"
                         onclick={handleStart}
-                        disabled={saving || !csvText.trim() || campaignRunning}
+                        disabled={saving || (!manualMode && !csvFile && !csvText.trim()) || campaignRunning}
                     >
                         {#if campaignRunning}<span
                                 class="loading loading-spinner loading-xs"

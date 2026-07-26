@@ -50,3 +50,4 @@ System to send a single promotional email campaign to **1,000,000 recipients**, 
 - System support sending 1M emails.
 - SPF, DKIM, DMARC must be configured on the sending domain to avoid landing in spam.
 - Final build can be run on Windows or Linux, User can run the application with minimum configuration and web server up to the point where the server is running and the web page is accessible.
+- CSV data can be big size (e.g., 100MB+), passing from the frontend to the backend should be processed gracefully using HTTP multipart form data.
