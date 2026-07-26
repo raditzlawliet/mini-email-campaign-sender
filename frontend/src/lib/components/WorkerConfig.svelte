@@ -2,7 +2,6 @@
     let {
         concurrency = $bindable(10),
         maxRetries = $bindable(3),
-        batchSize = $bindable(50),
         backoffBase = $bindable("1s"),
         backoffMax = $bindable("30s"),
         disabled = false,
@@ -24,19 +23,6 @@
                 {disabled}
             />
             <p class="fieldset-label">Number of parallel workers (1–100)</p>
-        </fieldset>
-        <fieldset class="fieldset">
-            <label class="label" for="cfg-batchsize">SMTP Batch Size</label>
-            <input
-                id="cfg-batchsize"
-                type="number"
-                class="input w-full"
-                min="1"
-                max="500"
-                bind:value={batchSize}
-                {disabled}
-            />
-            <p class="fieldset-label">Emails per SMTP connection (1–500)</p>
         </fieldset>
         <fieldset class="fieldset">
             <label class="label" for="cfg-maxretries">Max Retries</label>

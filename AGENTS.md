@@ -30,7 +30,7 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 | GET | `/api/campaign/events` | SSE stream: pushes progress + log events every 1s |
 | POST | `/api/campaign/reset` | Clear all campaign state (works on paused too) |
 
-Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`. Preview also accepts `count`.
+Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `smtp_batch_size`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`, `log_to_file`, `verbose`. Preview also accepts `count`.
 
 ## Naming Conventions
 
@@ -65,18 +65,19 @@ internal/
   config/                # YAML config loading
   handler/               # 7 HTTP handlers (Go Fiber v3)
   worker/                # worker pool, queue, retry logic, RunPending for resume
-  email/                 # SMTP + SES senders, template rendering
+  email/                 # SMTP + SES senders, template rendering, batched SMTP
   store/                 # in-memory recipient status store
   campaign/              # CSV parsing, campaign orchestration, file logging
 frontend/
   src/
     lib/
       components/
-        CampaignForm.svelte   # orchestrator: state, API calls, progress
+        CampaignForm.svelte   # orchestrator: state, API calls, tabs, progress
         InputData.svelte      # file picker + manual toggle + multipart file emit
         EmailTemplate.svelte  # To, Subject, Body + body preview modal
-        ProviderConfig.svelte # SMTP/SES config, fieldset+label+input
+        ProviderConfig.svelte # SMTP/SES config, batch_size, fieldset+label+input
         WorkerConfig.svelte   # concurrency, retries, backoff
+        LogConfig.svelte      # log_to_file and verbose toggles
         PreviewModal.svelte   # iframe sandbox render, code tab, next/prev
     App.svelte
     main.js

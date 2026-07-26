@@ -7,6 +7,7 @@
         smtpUsername = $bindable(""),
         smtpPassword = $bindable(""),
         smtpTLS = $bindable(false),
+        smtpBatchSize = $bindable(50),
         sesRegion = $bindable(""),
         sesAccessKeyId = $bindable(""),
         sesSecretAccessKey = $bindable(""),
@@ -86,6 +87,19 @@
                     bind:value={smtpPassword}
                     {disabled}
                 />
+            </fieldset>
+            <fieldset class="fieldset">
+                <label class="label" for="cfg-smtp-batch">Batch Size</label>
+                <input
+                    id="cfg-smtp-batch"
+                    type="number"
+                    class="input w-full"
+                    min="1"
+                    max="500"
+                    bind:value={smtpBatchSize}
+                    {disabled}
+                />
+                <p class="fieldset-label">Emails per SMTP connection (1–500)</p>
             </fieldset>
         </div>
         <fieldset class="fieldset">

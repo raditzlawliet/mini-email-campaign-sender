@@ -33,6 +33,7 @@
     let smtpUsername = $state("");
     let smtpPassword = $state("");
     let smtpTLS = $state(false);
+    let smtpBatchSize = $state(50);
     let sesRegion = $state("");
     let sesAccessKeyId = $state("");
     let sesSecretAccessKey = $state("");
@@ -40,7 +41,6 @@
     // --- Worker ---
     let concurrency = $state(10);
     let maxRetries = $state(3);
-    let batchSize = $state(50);
     let backoffBase = $state("1s");
     let backoffMax = $state("30s");
 
@@ -131,12 +131,12 @@
             smtpUsername = data.email.smtp?.Username || "";
             smtpPassword = data.email.smtp?.Password || "";
             smtpTLS = data.email.smtp?.TLS || false;
+            smtpBatchSize = data.email.smtp?.BatchSize || 50;
             sesRegion = data.email.ses?.Region || "";
             sesAccessKeyId = data.email.ses?.AccessKeyID || "";
             sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
             concurrency = data.worker?.Concurrency || 10;
             maxRetries = data.worker?.MaxRetries || 3;
-            batchSize = data.email?.smtp?.BatchSize || 50;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
             logToFile = data.log?.campaign?.log_to_file ?? true;
@@ -166,7 +166,7 @@
                     if (c.ses?.SecretAccessKey) sesSecretAccessKey = c.ses.SecretAccessKey;
                     if (c.worker?.Concurrency) concurrency = c.worker.Concurrency;
                     if (c.worker?.MaxRetries) maxRetries = c.worker.MaxRetries;
-                    if (c.smtp_batch_size) batchSize = c.smtp_batch_size;
+                    if (c.smtp_batch_size) smtpBatchSize = c.smtp_batch_size;
                     if (c.log_to_file !== undefined) logToFile = c.log_to_file;
                     if (c.verbose !== undefined) verbose = c.verbose;
                 }
@@ -208,7 +208,7 @@
         fd.append("ses_secret_access_key", sesSecretAccessKey);
         fd.append("concurrency", String(concurrency));
         fd.append("max_retries", String(maxRetries));
-        fd.append("smtp_batch_size", String(batchSize));
+        fd.append("smtp_batch_size", String(smtpBatchSize));
         fd.append("retry_backoff_base", backoffBase);
         fd.append("retry_backoff_max", backoffMax);
         fd.append("log_to_file", String(logToFile));
@@ -330,6 +330,7 @@
             smtpUsername = data.email.smtp?.Username || "";
             smtpPassword = data.email.smtp?.Password || "";
             smtpTLS = data.email.smtp?.TLS || false;
+            smtpBatchSize = data.email.smtp?.BatchSize || 50;
             sesRegion = data.email.ses?.Region || "";
             sesAccessKeyId = data.email.ses?.AccessKeyID || "";
             sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
@@ -346,7 +347,6 @@
             const data = await apiGet("/api/campaign/config");
             concurrency = data.worker?.Concurrency || 10;
             maxRetries = data.worker?.MaxRetries || 3;
-            batchSize = data.email?.smtp?.BatchSize || 50;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
         } catch (e) {
@@ -448,6 +448,7 @@
                         bind:smtpUsername
                         bind:smtpPassword
                         bind:smtpTLS
+                        bind:smtpBatchSize
                         bind:sesRegion
                         bind:sesAccessKeyId
                         bind:sesSecretAccessKey
@@ -458,7 +459,6 @@
                     <WorkerConfig
                         bind:concurrency
                         bind:maxRetries
-                        bind:batchSize
                         bind:backoffBase
                         bind:backoffMax
                         disabled={campaignRunning}
