@@ -42,7 +42,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("starting MECS", "version", version, "port", cfg.Server.Port, "provider", cfg.Email.Provider)
+	slog.Info("starting MECS - Mini Email Campaign Sender", "version", version, "port", cfg.Server.Port, "provider", cfg.Email.Provider)
 
 	store.InitStore()
 	st := store.GetStore()

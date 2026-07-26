@@ -3,7 +3,7 @@
 Send personalized email campaigns via SMTP or Amazon SES, with real-time progress tracking, pause/resume, retry logic, and a clean web interface.
 
 <p align="center">
-  <img src="./docs/preview.png" alt="Preview">
+  <img src="./docs/preview.gif" alt="Preview">
 </p>
 
 ## Features
