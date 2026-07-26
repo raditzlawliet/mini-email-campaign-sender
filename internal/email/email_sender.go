@@ -19,6 +19,11 @@ type SenderConfig struct {
 	SES      config.SESConfig  `json:"ses"`
 }
 
+// SenderFactory creates a new EmailSender instance.
+// Each worker goroutine calls this to get its own dedicated sender,
+// avoiding contention on a shared instance.
+type SenderFactory func() (EmailSender, error)
+
 // NewSender creates an EmailSender based on the provider in the configuration.
 func NewSender(cfg SenderConfig) (EmailSender, error) {
 	switch cfg.Provider {

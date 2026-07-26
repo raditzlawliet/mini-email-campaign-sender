@@ -92,7 +92,10 @@ func (h *Handler) HandleStart(c fiber.Ctx) error {
 	}
 	req.CSV = csvText
 
-	logger, err := campaign.NewCampaignLogger(".")
+	logCfg := h.DefaultConfig.Log.Campaign
+	h.Store.SetVerbose(logCfg.Verbose)
+
+	logger, err := campaign.NewCampaignLogger(".", logCfg.LogToFile, logCfg.Verbose)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to create campaign logger: " + err.Error()})
 	}
@@ -116,7 +119,10 @@ func (h *Handler) HandleResume(c fiber.Ctx) error {
 	if !h.Store.IsPaused() {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "campaign is not paused"})
 	}
-	logger, err := campaign.NewCampaignLogger(".")
+	logCfg := h.DefaultConfig.Log.Campaign
+	h.Store.SetVerbose(logCfg.Verbose)
+
+	logger, err := campaign.NewCampaignLogger(".", logCfg.LogToFile, logCfg.Verbose)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to create campaign logger: " + err.Error()})
 	}

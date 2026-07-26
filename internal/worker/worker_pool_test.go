@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/raditzlawliet/test-mass-email/internal/email"
 	"github.com/raditzlawliet/test-mass-email/internal/store"
 )
 
@@ -28,8 +29,8 @@ func newMockSender() *mockSender {
 	}
 }
 
-func (m *mockSender) setFailsFor(email string, count int) {
-	m.failsFor[email] = count
+func (m *mockSender) setFailsFor(emailAddr string, count int) {
+	m.failsFor[emailAddr] = count
 }
 
 func (m *mockSender) Send(to string, subject string, body string) error {
@@ -50,6 +51,12 @@ type mockLogger struct{}
 
 func (m *mockLogger) Log(level, msg string) {}
 func (m *mockLogger) Close()                {}
+
+func newMockFactory(sender *mockSender) email.SenderFactory {
+	return func() (email.EmailSender, error) {
+		return sender, nil
+	}
+}
 
 func TestWorkerPool_Run(t *testing.T) {
 	t.Run("sends all emails successfully", func(t *testing.T) {
@@ -74,7 +81,7 @@ func TestWorkerPool_Run(t *testing.T) {
 			BackoffMax:  100 * time.Millisecond,
 		}
 
-		result := wp.Run(context.Background(), sender, st, &mockLogger{})
+		result := wp.Run(context.Background(), newMockFactory(sender), st, &mockLogger{})
 
 		assert.Equal(3, result.Sent)
 		assert.Equal(0, result.Failed)
@@ -106,7 +113,7 @@ func TestWorkerPool_Run(t *testing.T) {
 			BackoffMax:  50 * time.Millisecond,
 		}
 
-		result := wp.Run(context.Background(), sender, st, &mockLogger{})
+		result := wp.Run(context.Background(), newMockFactory(sender), st, &mockLogger{})
 
 		assert.Equal(1, result.Sent)
 		assert.Equal(0, result.Failed)
@@ -138,7 +145,7 @@ func TestWorkerPool_Run(t *testing.T) {
 			BackoffMax:  20 * time.Millisecond,
 		}
 
-		result := wp.Run(context.Background(), sender, st, &mockLogger{})
+		result := wp.Run(context.Background(), newMockFactory(sender), st, &mockLogger{})
 
 		assert.Equal(0, result.Sent)
 		assert.Equal(1, result.Failed)
@@ -181,7 +188,7 @@ func TestWorkerPool_Run(t *testing.T) {
 			cancel()
 		}()
 
-		result := wp.Run(ctx, sender, st, &mockLogger{})
+		result := wp.Run(ctx, newMockFactory(sender), st, &mockLogger{})
 
 		// Some emails processed, but not all 100
 		require.Less(result.Sent+result.Failed, 100)

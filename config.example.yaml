@@ -20,3 +20,8 @@ worker:
   max_retries: 3
   retry_backoff_base: "1s"
   retry_backoff_max: "30s"
+
+log:
+  campaign:
+    log_to_file: true   # write campaign events to logs/campaign_*.log
+    verbose: false       # include debug-level detail (per-email send/retry)

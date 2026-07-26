@@ -158,7 +158,7 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 		},
 	})
 
-	sender, wp, err := buildSenderAndPool(defaultCfg, req)
+	factory, wp, err := buildSenderFactory(defaultCfg, req)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 	st.SetCancelFn(cancel)
 
 	go func() {
-		wp.Run(ctx, sender, st, logger)
+		wp.Run(ctx, factory, st, logger)
 		if st.GetState() == store.StateRunning {
 			st.FinishCampaign()
 			st.LogAndEvent("info", "Campaign completed")
@@ -188,7 +188,7 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 
 // ResumeCampaign restarts the worker pool for only pending recipients.
 func ResumeCampaign(parentCtx context.Context, defaultCfg *config.Config, st *store.Store, req CampaignRequest, logger *CampaignLogger) error {
-	sender, wp, err := buildSenderAndPool(defaultCfg, req)
+	factory, wp, err := buildSenderFactory(defaultCfg, req)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func ResumeCampaign(parentCtx context.Context, defaultCfg *config.Config, st *st
 	st.SetCancelFn(cancel)
 
 	go func() {
-		wp.RunPending(ctx, sender, st, logger)
+		wp.RunPending(ctx, factory, st, logger)
 		if st.GetState() == store.StateRunning {
 			st.FinishCampaign()
 			st.LogAndEvent("info", "Campaign completed")
@@ -211,7 +211,7 @@ func ResumeCampaign(parentCtx context.Context, defaultCfg *config.Config, st *st
 	return nil
 }
 
-func buildSenderAndPool(defaultCfg *config.Config, req CampaignRequest) (email.EmailSender, *worker.WorkerPool, error) {
+func buildSenderFactory(defaultCfg *config.Config, req CampaignRequest) (email.SenderFactory, *worker.WorkerPool, error) {
 	senderCfg := email.SenderConfig{
 		Provider: defaultCfg.Email.Provider,
 		From:     defaultCfg.Email.From,
@@ -231,9 +231,9 @@ func buildSenderAndPool(defaultCfg *config.Config, req CampaignRequest) (email.E
 		senderCfg.SES = req.SES
 	}
 
-	sender, err := email.NewSender(senderCfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating email sender: %w", err)
+	// Factory creates a fresh sender per worker goroutine.
+	factory := func() (email.EmailSender, error) {
+		return email.NewSender(senderCfg)
 	}
 
 	workerCfg := defaultCfg.Worker
@@ -261,7 +261,7 @@ func buildSenderAndPool(defaultCfg *config.Config, req CampaignRequest) (email.E
 		BackoffMax:  workerCfg.RetryBackoffMax,
 	}
 
-	return sender, wp, nil
+	return factory, wp, nil
 }
 
 func parseDuration(s string) (time.Duration, error) {

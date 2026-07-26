@@ -13,6 +13,18 @@ type Config struct {
 	Server ServerConfig `yaml:"server"`
 	Email  EmailConfig  `yaml:"email"`
 	Worker WorkerConfig `yaml:"worker"`
+	Log    LogConfig    `yaml:"log"`
+}
+
+// LogConfig holds logging configuration.
+type LogConfig struct {
+	Campaign CampaignLogConfig `yaml:"campaign"`
+}
+
+// CampaignLogConfig holds campaign-specific logging settings.
+type CampaignLogConfig struct {
+	LogToFile bool `yaml:"log_to_file"`
+	Verbose   bool `yaml:"verbose"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -65,6 +77,7 @@ type rawConfig struct {
 	Server ServerConfig    `yaml:"server"`
 	Email  EmailConfig     `yaml:"email"`
 	Worker rawWorkerConfig `yaml:"worker"`
+	Log    LogConfig       `yaml:"log"`
 }
 
 // Load reads and parses a YAML configuration file at the given path.
@@ -104,6 +117,7 @@ func Load(path string) (*Config, error) {
 			RetryBackoffBase: backoffBase,
 			RetryBackoffMax:  backoffMax,
 		},
+		Log: raw.Log,
 	}
 
 	if cfg.Email.Provider == "" {

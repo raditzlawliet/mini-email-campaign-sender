@@ -10,12 +10,20 @@ import (
 
 // CampaignLogger writes campaign events to a log file with simple JSON lines.
 type CampaignLogger struct {
-	file *os.File
-	path string
+	file    *os.File
+	path    string
+	verbose bool
 }
 
-// NewCampaignLogger creates a new CampaignLogger that writes to a timestamped file.
-func NewCampaignLogger(baseDir string) (*CampaignLogger, error) {
+// NewCampaignLogger creates a new CampaignLogger.
+// If logToFile is false, no file is created and Log is a no-op.
+func NewCampaignLogger(baseDir string, logToFile bool, verbose bool) (*CampaignLogger, error) {
+	cl := &CampaignLogger{verbose: verbose}
+
+	if !logToFile {
+		return cl, nil
+	}
+
 	logsDir := filepath.Join(baseDir, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return nil, fmt.Errorf("creating logs directory %s: %w", logsDir, err)
@@ -31,12 +39,18 @@ func NewCampaignLogger(baseDir string) (*CampaignLogger, error) {
 
 	slog.Info("campaign logger created", "path", path)
 
-	return &CampaignLogger{file: f, path: path}, nil
+	cl.file = f
+	cl.path = path
+	return cl, nil
 }
 
-// Log writes a log entry to the file with the same message as console/frontend.
+// Log writes a log entry to the file.
+// Debug-level messages are suppressed unless verbose mode is enabled.
 func (cl *CampaignLogger) Log(level, msg string) {
 	if cl.file == nil {
+		return
+	}
+	if level == "debug" && !cl.verbose {
 		return
 	}
 	t := time.Now().Format(time.RFC3339)

@@ -69,6 +69,7 @@ type Store struct {
 	state      CampaignState
 	events     []LogEntry
 	cancelFn   context.CancelFunc
+	verbose    bool
 }
 
 var (
@@ -91,6 +92,13 @@ func InitStore() {
 			state:      StateIdle,
 		}
 	})
+}
+
+// SetVerbose enables or disables verbose (debug-level) event logging.
+func (s *Store) SetVerbose(v bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.verbose = v
 }
 
 // SetCSV replaces the recipient list from parsed CSV data.
@@ -228,6 +236,11 @@ func (s *Store) LogAndEvent(level, message string) {
 		slog.Error(message)
 	case "warn":
 		slog.Warn(message)
+	case "debug":
+		slog.Debug(message)
+		if !s.verbose {
+			return
+		}
 	default:
 		slog.Info(message)
 	}

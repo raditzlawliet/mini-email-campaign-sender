@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/raditzlawliet/test-mass-email/internal/email"
@@ -31,13 +32,14 @@ type RunResult struct {
 }
 
 // Run starts the worker pool to process all recipients.
-func (wp *WorkerPool) Run(ctx context.Context, sender email.EmailSender, st *store.Store, logger CampaignLogWriter) RunResult {
+// factory is called once per worker goroutine to create a dedicated sender instance.
+func (wp *WorkerPool) Run(ctx context.Context, factory email.SenderFactory, st *store.Store, logger CampaignLogWriter) RunResult {
 	recipients := st.GetRecipients()
-	return wp.processRecipients(ctx, sender, st, logger, recipients)
+	return wp.processRecipients(ctx, factory, st, logger, recipients)
 }
 
 // RunPending starts the worker pool to process only pending recipients.
-func (wp *WorkerPool) RunPending(ctx context.Context, sender email.EmailSender, st *store.Store, logger CampaignLogWriter) RunResult {
+func (wp *WorkerPool) RunPending(ctx context.Context, factory email.SenderFactory, st *store.Store, logger CampaignLogWriter) RunResult {
 	all := st.GetRecipients()
 	statuses := st.GetAllStatuses()
 	var pending []store.Recipient
@@ -46,10 +48,10 @@ func (wp *WorkerPool) RunPending(ctx context.Context, sender email.EmailSender, 
 			pending = append(pending, r)
 		}
 	}
-	return wp.processRecipients(ctx, sender, st, logger, pending)
+	return wp.processRecipients(ctx, factory, st, logger, pending)
 }
 
-func (wp *WorkerPool) processRecipients(ctx context.Context, sender email.EmailSender, st *store.Store, logger CampaignLogWriter, recipients []store.Recipient) RunResult {
+func (wp *WorkerPool) processRecipients(ctx context.Context, factory email.SenderFactory, st *store.Store, logger CampaignLogWriter, recipients []store.Recipient) RunResult {
 	if len(recipients) == 0 {
 		return RunResult{}
 	}
@@ -61,20 +63,30 @@ func (wp *WorkerPool) processRecipients(ctx context.Context, sender email.EmailS
 	close(queue)
 
 	var wg sync.WaitGroup
-	var sentCount, failedCount int
-	var mu sync.Mutex
+	var sentCount, failedCount int64
 
 	for i := 0; i < wp.Concurrency; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			wp.worker(ctx, workerID, queue, sender, st, logger, &sentCount, &failedCount, &mu)
+			sender, err := factory()
+			if err != nil {
+				msg := fmt.Sprintf("Worker %d: failed to create sender: %v", workerID, err)
+				logger.Log("error", msg)
+				st.LogAndEvent("error", msg)
+				// Drain queue to prevent deadlock
+				for range queue {
+					atomic.AddInt64(&failedCount, 1)
+				}
+				return
+			}
+			wp.worker(ctx, workerID, queue, sender, st, logger, &sentCount, &failedCount)
 		}(i)
 	}
 
 	wg.Wait()
 
-	result := RunResult{Sent: sentCount, Failed: failedCount}
+	result := RunResult{Sent: int(sentCount), Failed: int(failedCount)}
 	msg := fmt.Sprintf("Batch done — %d sent, %d failed", sentCount, failedCount)
 	logger.Log("info", msg)
 	st.LogAndEvent("info", msg)
@@ -85,7 +97,7 @@ func (wp *WorkerPool) processRecipients(ctx context.Context, sender email.EmailS
 func (wp *WorkerPool) worker(
 	ctx context.Context, workerID int, queue <-chan store.Recipient,
 	sender email.EmailSender, st *store.Store, logger CampaignLogWriter,
-	sentCount *int, failedCount *int, mu *sync.Mutex,
+	sentCount *int64, failedCount *int64,
 ) {
 	for {
 		select {
@@ -95,7 +107,7 @@ func (wp *WorkerPool) worker(
 			if !ok {
 				return
 			}
-			wp.processRecipient(ctx, workerID, recipient, sender, st, logger, sentCount, failedCount, mu)
+			wp.processRecipient(ctx, workerID, recipient, sender, st, logger, sentCount, failedCount)
 		}
 	}
 }
@@ -103,7 +115,7 @@ func (wp *WorkerPool) worker(
 func (wp *WorkerPool) processRecipient(
 	ctx context.Context, workerID int, recipient store.Recipient,
 	sender email.EmailSender, st *store.Store, logger CampaignLogWriter,
-	sentCount *int, failedCount *int, mu *sync.Mutex,
+	sentCount *int64, failedCount *int64,
 ) {
 	tmpl := st.GetTemplate()
 	toAddr := email.Render(tmpl.To, recipient.Data)
@@ -138,12 +150,10 @@ func (wp *WorkerPool) processRecipient(
 				SentAt:   &now,
 			})
 			msg := fmt.Sprintf("Sent to %s (%d attempt(s))", recipient.Email, attempts)
-			logger.Log("info", msg)
-			st.LogAndEvent("info", msg)
+			logger.Log("debug", msg)
+			st.LogAndEvent("debug", msg)
 
-			mu.Lock()
-			*sentCount++
-			mu.Unlock()
+			atomic.AddInt64(sentCount, 1)
 			return
 		}
 
@@ -179,7 +189,5 @@ func (wp *WorkerPool) processRecipient(
 	logger.Log("error", msg)
 	st.LogAndEvent("error", msg)
 
-	mu.Lock()
-	*failedCount++
-	mu.Unlock()
+	atomic.AddInt64(failedCount, 1)
 }

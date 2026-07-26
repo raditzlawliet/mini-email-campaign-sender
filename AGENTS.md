@@ -9,7 +9,7 @@ Single-page app to send personalized email campaigns to 1M recipients per campai
 - **Frontend**: Svelte 5 (runes), TailwindCSS v4, DaisyUI v5, Embed in Go binary.
 - **Backend**: Go, Go Fiber v3, `wneessen/go-mail` for email sending, `slog` for logging.
 - **Email Testing**: Mailtrap Local (`mailtrap-local`)
-- **Config**: File-based YAML for server port, email provider, retry params
+- **Config**: File-based YAML for server port, email provider, retry params, log behavior
 - **Dev mode**: `DEV_MODE=true` enables CORS + API-only backend; Vite proxies `/api` to backend on `:8080`.
 
 ## Spec Flow
@@ -87,10 +87,11 @@ frontend/
 
 - `slog` for all logging: `LevelError`/`LevelInfo`/`LevelDebug`.
 - Placeholders `{key}` rendered via `strings.NewReplacer`.
-- Worker pool: context cancellation, exponential backoff retry.
+- Worker pool: context cancellation, exponential backoff retry. Each worker goroutine creates its own `EmailSender` via `SenderFactory`, avoiding contention on a shared sender instance.
 - Pause: cancels context between sends (in-flight email completes gracefully). Resume: `RunPending` processes only `pending` recipients.
 - Unified logging: `Store.LogAndEvent(level, msg)` logs to both `slog` (console) and in-memory events (frontend). `CampaignLogger.Log(level, msg)` writes the same message to a JSON file per run.
-- Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`.
+- Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`. Controlled by `log.campaign.log_to_file` in config.
+- Verbose logging: `log.campaign.verbose: true` enables debug-level per-email events in frontend (SSE) and campaign log file. Terminal output follows slog handler level (Info by default suppresses debug).
 - CSV upload: large files (100MB+) sent via `multipart/form-data` (`csv_file` field) to `parseMultipart()` in handler. Manual input sent as `csv_text` text field. Avoids JSON body size limits.
 - Test with `testify` (`assert`/`require`), each subtest gets its own `assert.New(t)`.
 - Slices/maps initialized explicitly (never nil).
