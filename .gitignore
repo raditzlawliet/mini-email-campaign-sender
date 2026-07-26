@@ -5,3 +5,7 @@ cmd/server/frontend_dist/
 logs/
 *.log
 config.yaml
+
+# Generated CSV data
+tools/gencsv/*.exe
+tools/gencsv/output.csv
