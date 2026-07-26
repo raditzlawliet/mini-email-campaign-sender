@@ -4,6 +4,12 @@
     import ProviderConfig from "./ProviderConfig.svelte";
     import WorkerConfig from "./WorkerConfig.svelte";
     import PreviewModal from "./PreviewModal.svelte";
+    import {
+        ChevronRight,
+        ChevronDown,
+        PauseIcon,
+        PlayIcon,
+    } from "@lucide/svelte";
 
     // --- Input Data ---
     let csvText = $state("");
@@ -47,7 +53,9 @@
         state: "idle",
     });
     let campaignRunning = $derived(
-        progress.state === "running" || progress.state === "ready" || progress.state === "paused",
+        progress.state === "running" ||
+            progress.state === "ready" ||
+            progress.state === "paused",
     );
     let loading = $state(true);
     let error = $state("");
@@ -61,7 +69,8 @@
     $effect(() => {
         if (logRef && logEvents.length) {
             const el = logRef;
-            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+            const atBottom =
+                el.scrollHeight - el.scrollTop - el.clientHeight < 50;
             if (atBottom || logEvents.length <= 1) {
                 el.scrollTop = el.scrollHeight;
             }
@@ -98,6 +107,7 @@
         error = "";
         try {
             const data = await apiGet("/api/campaign/config");
+            // Default config
             fromEmail = data.email.from || "";
             provider = data.email.provider || "smtp";
             smtpHost = data.email.smtp?.Host || "";
@@ -112,6 +122,37 @@
             maxRetries = data.worker?.MaxRetries || 3;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
+
+            // Restore campaign session on refresh
+            const camp = data.campaign;
+            if (camp && camp.state !== "idle") {
+                // Restore template
+                if (camp.template) {
+                    subject = camp.template.subject || "";
+                    body = camp.template.body || "";
+                    toField = camp.template.to || "";
+                }
+                // Restore config overrides
+                if (camp.config) {
+                    const c = camp.config;
+                    if (c.from) fromEmail = c.from;
+                    if (c.provider) provider = c.provider;
+                    if (c.smtp?.Host) smtpHost = c.smtp.Host;
+                    if (c.smtp?.Port) smtpPort = String(c.smtp.Port);
+                    if (c.smtp?.Username) smtpUsername = c.smtp.Username;
+                    if (c.smtp?.Password) smtpPassword = c.smtp.Password;
+                    if (c.smtp?.TLS !== undefined) smtpTLS = c.smtp.TLS;
+                    if (c.ses?.Region) sesRegion = c.ses.Region;
+                    if (c.ses?.AccessKeyID) sesAccessKeyId = c.ses.AccessKeyID;
+                    if (c.ses?.SecretAccessKey) sesSecretAccessKey = c.ses.SecretAccessKey;
+                    if (c.worker?.Concurrency) concurrency = c.worker.Concurrency;
+                    if (c.worker?.MaxRetries) maxRetries = c.worker.MaxRetries;
+                }
+                // Restore progress and log
+                progress = camp.progress || progress;
+                logEvents = camp.events || [];
+                logOpen = camp.state === "running" || camp.state === "paused" || camp.state === "completed";
+            }
         } catch (e) {
             error = "Failed to load config: " + e.message;
         } finally {
@@ -166,8 +207,25 @@
         }
     }
 
-    let progressInterval;
-    let logInterval;
+    let eventSource;
+
+    function initSSE() {
+        eventSource = new EventSource("/api/campaign/events");
+        eventSource.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                progress = data.progress;
+                logEvents = data.events || [];
+            } catch (_) {}
+        };
+        eventSource.onerror = () => {
+            eventSource.close();
+            setTimeout(initSSE, 3000);
+        };
+    }
+
+    $effect(() => { initSSE(); });
+
     async function handleStart() {
         if (!csvText.trim()) {
             error = "Please provide CSV data first.";
@@ -175,30 +233,11 @@
         }
         saving = true;
         error = "";
+        logEvents = [];
         try {
             await apiPost("/api/campaign/start", buildPayload());
             progress.state = "running";
-            progressInterval = setInterval(async () => {
-                try {
-                    progress = await apiGet("/api/campaign/progress");
-                    if (
-                        progress.state === "completed" ||
-                        progress.state === "idle"
-                    ) {
-                        clearInterval(progressInterval);
-                    }
-                } catch (e) {
-                    /* ignore */
-                }
-            }, 1000);
-            // Log polling
             logOpen = true;
-            logInterval = setInterval(async () => {
-                try {
-                    const data = await apiGet("/api/campaign/log");
-                    logEvents = data.events || [];
-                } catch (e) { /* ignore */ }
-            }, 2000);
         } catch (e) {
             error = "Start failed: " + e.message;
         } finally {
@@ -242,8 +281,6 @@
                 pending: 0,
                 state: "idle",
             };
-            clearInterval(progressInterval);
-            clearInterval(logInterval);
             logEvents = [];
             logOpen = false;
         } catch (e) {
@@ -326,6 +363,7 @@
             bind:csvCount
             bind:manualMode
             bind:fileName
+            disabled={campaignRunning}
         />
 
         <EmailTemplate
@@ -383,28 +421,49 @@
         <!-- Actions -->
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
-                <h2 class="card-title text-lg">Actions</h2>
                 <div class="flex flex-wrap gap-3">
-                    <button class="btn btn-outline" onclick={handlePreview}
-                        disabled={saving || !csvText.trim() || campaignRunning}>
-                        {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
+                    <button
+                        class="btn btn-outline"
+                        onclick={handlePreview}
+                        disabled={saving || !csvText.trim() || campaignRunning}
+                    >
+                        {#if saving}<span
+                                class="loading loading-spinner loading-xs"
+                            ></span>{/if}
                         Dry-Run Preview
                     </button>
                     {#if progress.state === "running"}
-                        <button class="btn btn-warning" onclick={handlePause} disabled={saving}>
-                            ⏸ Pause
+                        <button
+                            class="btn btn-warning"
+                            onclick={handlePause}
+                            disabled={saving}
+                        >
+                            <PauseIcon class="w-4 h-4"></PauseIcon> Pause
                         </button>
                     {:else if progress.state === "paused"}
-                        <button class="btn btn-success" onclick={handleResume} disabled={saving}>
-                            ▶ Resume
+                        <button
+                            class="btn btn-success"
+                            onclick={handleResume}
+                            disabled={saving}
+                        >
+                            <PlayIcon class="w-4 h-4"></PlayIcon> Resume
                         </button>
                     {/if}
-                    <button class="btn btn-primary" onclick={handleStart}
-                        disabled={saving || !csvText.trim() || campaignRunning}>
-                        {#if campaignRunning}<span class="loading loading-spinner loading-xs"></span>{/if}
-                        Start Campaign
+                    <button
+                        class="btn btn-primary"
+                        onclick={handleStart}
+                        disabled={saving || !csvText.trim() || campaignRunning}
+                    >
+                        {#if campaignRunning}<span
+                                class="loading loading-spinner loading-xs"
+                            ></span>{/if}
+                        <PlayIcon class="w-4 h-4"></PlayIcon> Start Campaign
                     </button>
-                    <button class="btn btn-ghost" onclick={handleReset} disabled={saving}>
+                    <button
+                        class="btn btn-ghost"
+                        onclick={handleReset}
+                        disabled={saving || progress.state === "running"}
+                    >
                         Reset
                     </button>
                 </div>
@@ -472,20 +531,44 @@
             <!-- Log -->
             <div class="card bg-base-100 shadow-sm mt-4">
                 <div class="card-body p-3">
-                    <button class="flex items-center justify-between w-full text-sm font-semibold"
-                        onclick={() => (logOpen = !logOpen)}>
+                    <button
+                        class="flex items-center justify-between w-full text-sm font-semibold"
+                        onclick={() => (logOpen = !logOpen)}
+                    >
                         <span>Campaign Log ({logEvents.length})</span>
-                        <span class="text-xs">{logOpen ? '▼' : '▶'}</span>
+                        <span class="text-xs">
+                            {#if logOpen}
+                                <ChevronDown class="w-4 h-4" />
+                            {:else}
+                                <ChevronRight class="w-4 h-4" />
+                            {/if}
+                        </span>
                     </button>
                     {#if logOpen}
-                        <div class="bg-base-300 rounded-box p-2 max-h-48 overflow-y-auto font-mono text-xs space-y-0.5" bind:this={logRef}>
+                        <div
+                            class="bg-base-300 rounded-box p-2 max-h-48 overflow-y-auto font-mono text-xs space-y-0.5"
+                            bind:this={logRef}
+                        >
                             {#if logEvents.length === 0}
-                                <span class="text-base-content/40">Waiting for events...</span>
+                                <span class="text-base-content/40"
+                                    >Waiting for events...</span
+                                >
                             {:else}
                                 {#each logEvents as ev}
                                     <div class="flex gap-2">
-                                        <span class="text-base-content/40 shrink-0">{ev.time?.slice(11, 19) || ''}</span>
-                                        <span class={ev.level === 'error' ? 'text-error' : ev.level === 'warn' ? 'text-warning' : 'text-base-content'}>{ev.message}</span>
+                                        <span
+                                            class="text-base-content/40 shrink-0"
+                                            >{ev.time?.slice(11, 19) ||
+                                                ""}</span
+                                        >
+                                        <span
+                                            class={ev.level === "error"
+                                                ? "text-error"
+                                                : ev.level === "warn"
+                                                  ? "text-warning"
+                                                  : "text-base-content"}
+                                            >{ev.message}</span
+                                        >
                                     </div>
                                 {/each}
                             {/if}

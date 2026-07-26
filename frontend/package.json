@@ -15,6 +15,7 @@
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "@lucide/svelte": "^1.27.0",
     "daisyui": "^5.0.0"
   },
   "allowScripts": {

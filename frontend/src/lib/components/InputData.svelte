@@ -5,6 +5,7 @@
         csvCount = $bindable(0),
         manualMode = $bindable(false),
         fileName = $bindable(""),
+        disabled = false,
     } = $props();
 
     let _csvText = $state(csvText);
@@ -78,17 +79,19 @@
             <h2 class="card-title text-lg">Input Data</h2>
             <label class="label cursor-pointer gap-2">
                 <span class="label-text text-sm">Manual input</span>
-                <input type="checkbox" class="toggle toggle-sm" checked={manualMode} onchange={toggleManual} />
+                <input type="checkbox" class="toggle toggle-sm" checked={manualMode} onchange={toggleManual} {disabled} />
             </label>
         </div>
 
         {#if !manualMode}
             <input id="csv-file-input" type="file" accept=".csv"
-                class="file-input file-input-bordered w-full" onchange={handleFile} />
+                class="file-input file-input-bordered w-full" onchange={handleFile}
+                disabled={disabled} />
         {:else}
             <textarea class="textarea textarea-bordered font-mono text-sm w-full" rows="5"
                 placeholder="name,email&#10;Alice,alice@example.com&#10;Bob,bob@example.com"
-                bind:value={_csvText} onblur={flushCSV}></textarea>
+                bind:value={_csvText} onblur={flushCSV}
+                disabled={disabled}></textarea>
         {/if}
 
         <div class="text-xs text-base-content/50 leading-relaxed">

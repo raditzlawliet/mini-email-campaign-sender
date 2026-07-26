@@ -1,4 +1,6 @@
 <script>
+    import { X, ChevronLeft, ChevronRight } from "@lucide/svelte";
+
     let { open = false, previews = [], onclose = () => {} } = $props();
 
     let current = $state(0);
@@ -28,7 +30,7 @@
                 <button
                     class="btn btn-sm btn-circle btn-ghost"
                     onclick={onclose}
-                    aria-label="Close">✕</button
+                    aria-label="Close"><X class="w-4 h-4" /></button
                 >
             </div>
 
@@ -46,14 +48,14 @@
                         <button
                             class="btn btn-sm btn-outline"
                             onclick={prev}
-                            disabled={current === 0}>← Prev</button
+                            disabled={current === 0}><ChevronLeft class="w-4 h-4" /></button
                         >
-                        <span class="">{current + 1} of {previews.length}</span>
+                        <span class="text-sm mx-1">{current + 1} of {previews.length}</span>
                         <button
                             class="btn btn-sm btn-outline"
                             onclick={next}
                             disabled={current === previews.length - 1}
-                            >Next →</button
+                            ><ChevronRight class="w-4 h-4" /></button
                         >
                     </div>
                     <div role="tablist" class="tabs tabs-bordered">

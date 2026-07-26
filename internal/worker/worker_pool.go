@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -13,9 +12,8 @@ import (
 
 // CampaignLogWriter is the interface for campaign logging.
 type CampaignLogWriter interface {
-	LogRecipient(index int, status string, errMsg string, attempts int)
-	LogRetry(index int, attempt int, maxRetries int, err error)
-	LogStatus(msg string, args ...any)
+	Log(level, msg string)
+	Close()
 }
 
 // WorkerPool manages concurrent email sending with retry logic.
@@ -76,10 +74,12 @@ func (wp *WorkerPool) processRecipients(ctx context.Context, sender email.EmailS
 
 	wg.Wait()
 
-	slog.Info("campaign batch finished", "sent", sentCount, "failed", failedCount)
-	logger.LogStatus("campaign batch finished", "sent", sentCount, "failed", failedCount)
+	result := RunResult{Sent: sentCount, Failed: failedCount}
+	msg := fmt.Sprintf("Batch done — %d sent, %d failed", sentCount, failedCount)
+	logger.Log("info", msg)
+	st.LogAndEvent("info", msg)
 
-	return RunResult{Sent: sentCount, Failed: failedCount}
+	return result
 }
 
 func (wp *WorkerPool) worker(
@@ -90,7 +90,6 @@ func (wp *WorkerPool) worker(
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Debug("worker shutting down", "workerID", workerID, "reason", ctx.Err())
 			return
 		case recipient, ok := <-queue:
 			if !ok {
@@ -138,19 +137,19 @@ func (wp *WorkerPool) processRecipient(
 				Attempts: attempts,
 				SentAt:   &now,
 			})
-			logger.LogRecipient(recipient.Index, "sent", "", attempts)
-			st.AddEvent("info", fmt.Sprintf("✓ Sent to %s (%d attempt(s))", recipient.Email, attempts))
+			msg := fmt.Sprintf("Sent to %s (%d attempt(s))", recipient.Email, attempts)
+			logger.Log("info", msg)
+			st.LogAndEvent("info", msg)
 
 			mu.Lock()
 			*sentCount++
 			mu.Unlock()
-
-			slog.Debug("email sent", "workerID", workerID, "index", recipient.Index, "email", recipient.Email, "attempts", attempts)
 			return
 		}
 
-		logger.LogRetry(recipient.Index, attempts, wp.MaxRetries, lastErr)
-		slog.Warn("email send failed, retrying", "workerID", workerID, "index", recipient.Index, "email", recipient.Email, "attempt", attempts, "error", lastErr)
+		msg := fmt.Sprintf("Retry %d/%d for %s: %v", attempts, wp.MaxRetries, recipient.Email, lastErr)
+		logger.Log("warn", msg)
+		st.LogAndEvent("warn", msg)
 
 		if attempts < wp.MaxRetries {
 			backoff := wp.BackoffBase * time.Duration(1<<(attempts-1))
@@ -176,12 +175,11 @@ func (wp *WorkerPool) processRecipient(
 		Error:    errMsg,
 		Attempts: attempts,
 	})
-	logger.LogRecipient(recipient.Index, "failed", errMsg, attempts)
-	st.AddEvent("error", fmt.Sprintf("✗ Failed: %s — %s", recipient.Email, errMsg))
+	msg := fmt.Sprintf("Failed: %s — %s", recipient.Email, errMsg)
+	logger.Log("error", msg)
+	st.LogAndEvent("error", msg)
 
 	mu.Lock()
 	*failedCount++
 	mu.Unlock()
-
-	slog.Error("email failed after all retries", "workerID", workerID, "index", recipient.Index, "email", recipient.Email, "attempts", attempts, "error", lastErr)
 }

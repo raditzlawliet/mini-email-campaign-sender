@@ -1,4 +1,4 @@
-# Mass Email Campaign Sender
+# Email Campaign Sender
 
 ## Overview
 
@@ -9,7 +9,7 @@ System to send a single promotional email campaign to **1,000,000 recipients**, 
 - Simple Email Campaign Page for that has a form for inputting campaign details, configure Email Provider and worker, and tracking progress.
   - Support data input CSV
   - Support template input with personalization placeholders by data header (e.g. `{name}`, `{email}`)
-  - Real-time progress tracking and status updates.
+  - Real-time progress tracking and status updates using SSE/Event
   - Support overwrite select and configure Email Provider configuration that already configure.
   - Support overwrite configure worker that already configure.
   - Dry-run / preview mode to test email content without sending.

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -212,19 +213,45 @@ func (s *Store) IsPaused() bool {
 	return s.state == StatePaused
 }
 
-// AddEvent appends a log event.
+// AddEvent appends a log event (in-memory only, for frontend).
+// Prefer LogAndEvent for events that should also appear in console.
 func (s *Store) AddEvent(level, message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.addEventLocked(level, message)
+}
+
+// LogAndEvent logs to both slog (console) and in-memory events (frontend).
+func (s *Store) LogAndEvent(level, message string) {
+	switch level {
+	case "error":
+		slog.Error(message)
+	case "warn":
+		slog.Warn(message)
+	default:
+		slog.Info(message)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.addEventLocked(level, message)
+}
+
+func (s *Store) addEventLocked(level, message string) {
 	s.events = append(s.events, LogEntry{
 		Time:    time.Now().Format(time.RFC3339),
 		Level:   level,
 		Message: message,
 	})
-	// Keep max 500 events in memory
 	if len(s.events) > 500 {
 		s.events = s.events[len(s.events)-500:]
 	}
+}
+
+// ClearEvents removes all in-memory log events.
+func (s *Store) ClearEvents() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = []LogEntry{}
 }
 
 // GetEvents returns a copy of all log events.

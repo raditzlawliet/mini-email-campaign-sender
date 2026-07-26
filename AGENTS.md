@@ -1,4 +1,4 @@
-# AGENTS.md — Mass Email Campaign Sender
+# AGENTS.md — Email Campaign Sender
 
 > AI agent configuration. Update as the project evolves. Keep it short.
 
@@ -22,13 +22,12 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/campaign/config` | Return default configuration |
+| GET | `/api/campaign/config` | Return default configuration + current campaign state (session restore) |
 | POST | `/api/campaign/preview` | Parse CSV + render N sample emails |
 | POST | `/api/campaign/start` | Parse CSV + start worker pool |
 | POST | `/api/campaign/pause` | Gracefully pause (wait for in-flight send, cancel ctx) |
 | POST | `/api/campaign/resume` | Resume processing pending recipients only |
-| GET | `/api/campaign/progress` | Poll sent/failed/pending counts + state |
-| GET | `/api/campaign/log` | Return in-memory campaign log events |
+| GET | `/api/campaign/events` | SSE stream: pushes progress + log events every 1s |
 | POST | `/api/campaign/reset` | Clear all campaign state (works on paused too) |
 
 Preview and Start accept the full payload: `csv`, `subject`, `body`, `to`, `from`, `provider`, `smtp`, `ses`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`.
@@ -64,7 +63,7 @@ Preview and Start accept the full payload: `csv`, `subject`, `body`, `to`, `from
 cmd/server/              # main entrypoint, embedded frontend
 internal/
   config/                # YAML config loading
-  handler/               # 8 HTTP handlers (Go Fiber v3)
+  handler/               # 7 HTTP handlers (Go Fiber v3)
   worker/                # worker pool, queue, retry logic, RunPending for resume
   email/                 # SMTP + SES senders, template rendering
   store/                 # in-memory recipient status store
@@ -90,7 +89,8 @@ frontend/
 - Placeholders `{key}` rendered via `strings.NewReplacer`.
 - Worker pool: context cancellation, exponential backoff retry.
 - Pause: cancels context between sends (in-flight email completes gracefully). Resume: `RunPending` processes only `pending` recipients.
-- Campaign log stored in-memory (max 500 events) + file-based JSON log per run.
+- Unified logging: `Store.LogAndEvent(level, msg)` logs to both `slog` (console) and in-memory events (frontend). `CampaignLogger.Log(level, msg)` writes the same message to a JSON file per run.
+- Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`.
 - Test with `testify` (`assert`/`require`), each subtest gets its own `assert.New(t)`.
 - Slices/maps initialized explicitly (never nil).
 - Integration tests use `//go:build integration` + Mailtrap Local.
@@ -101,6 +101,10 @@ frontend/
 - **Form pattern**: `<fieldset class="fieldset">` wrapping `<label class="label" for="id">` + `<input id="..." class="input w-full">`.
 - **Iframe sandbox**: Preview modes use sandboxed iframes with `srcdoc` to isolate email content.
 - **Log panel**: Collapsable below progress, auto-scrolls when scrolled to bottom, shows timestamped events from backend.
+- **SSE**: Single `EventSource` connected on mount via `GET /api/campaign/events`, never disconnected. Streams progress + log every 1s.
+- **Session restore**: On page refresh, `GET /api/campaign/config` returns current campaign state (template, config, progress, events). Form restores to in-progress state if campaign is running/paused/completed.
+- **Form lock**: Input data, template, provider, and worker config are disabled when campaign is running or paused. Reset button disabled only when `running` (enabled on paused/completed).
+- **Icons**: Use `@lucide/svelte` for icons (ChevronRight/Down, X, ChevronLeft/Right).
 - **Literal braces**: Use `{'{name}'}` syntax in template HTML to output literal `{name}`.
 
 ## Testing Rules

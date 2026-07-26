@@ -6,19 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/raditzlawliet/test-mass-email/internal/config"
-	"github.com/raditzlawliet/test-mass-email/internal/email"
 )
 
-// CampaignLogger writes campaign events to a log file with structured logging.
+// CampaignLogger writes campaign events to a log file with simple JSON lines.
 type CampaignLogger struct {
 	file *os.File
 	path string
 }
 
-// NewCampaignLogger creates a new CampaignLogger that writes to a timestamped
-// file in the given base directory.
+// NewCampaignLogger creates a new CampaignLogger that writes to a timestamped file.
 func NewCampaignLogger(baseDir string) (*CampaignLogger, error) {
 	logsDir := filepath.Join(baseDir, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
@@ -35,56 +31,16 @@ func NewCampaignLogger(baseDir string) (*CampaignLogger, error) {
 
 	slog.Info("campaign logger created", "path", path)
 
-	return &CampaignLogger{
-		file: f,
-		path: path,
-	}, nil
+	return &CampaignLogger{file: f, path: path}, nil
 }
 
-// LogConfig writes the campaign configuration to the log.
-func (cl *CampaignLogger) LogConfig(senderCfg email.SenderConfig, workerCfg config.WorkerConfig) {
-	cl.write(slog.LevelInfo, "campaign configuration",
-		"provider", senderCfg.Provider,
-		"from", senderCfg.From,
-		"smtp_host", senderCfg.SMTP.Host,
-		"smtp_port", senderCfg.SMTP.Port,
-		"concurrency", workerCfg.Concurrency,
-		"max_retries", workerCfg.MaxRetries,
-		"retry_backoff_base", workerCfg.RetryBackoffBase.String(),
-		"retry_backoff_max", workerCfg.RetryBackoffMax.String(),
-	)
-}
-
-// LogStatus writes a general status message to the log.
-func (cl *CampaignLogger) LogStatus(msg string, args ...any) {
-	cl.write(slog.LevelInfo, msg, args...)
-}
-
-// LogRecipient writes a recipient result to the log.
-func (cl *CampaignLogger) LogRecipient(index int, status string, errMsg string, attempts int) {
-	args := []any{
-		"index", index,
-		"status", status,
-		"attempts", attempts,
+// Log writes a log entry to the file with the same message as console/frontend.
+func (cl *CampaignLogger) Log(level, msg string) {
+	if cl.file == nil {
+		return
 	}
-	if errMsg != "" {
-		args = append(args, "error", errMsg)
-	}
-	level := slog.LevelInfo
-	if status == "failed" {
-		level = slog.LevelError
-	}
-	cl.write(level, "recipient result", args...)
-}
-
-// LogRetry writes a retry attempt to the log.
-func (cl *CampaignLogger) LogRetry(index int, attempt int, maxRetries int, err error) {
-	cl.write(slog.LevelWarn, "retry attempt",
-		"index", index,
-		"attempt", attempt,
-		"max_retries", maxRetries,
-		"error", err.Error(),
-	)
+	t := time.Now().Format(time.RFC3339)
+	fmt.Fprintf(cl.file, `{"time":"%s","level":"%s","msg":"%s"}`+"\n", t, level, msg)
 }
 
 // Path returns the full path to the log file.
@@ -98,29 +54,5 @@ func (cl *CampaignLogger) Close() {
 		slog.Info("campaign log closed", "path", cl.path)
 		cl.file.Close()
 		cl.file = nil
-	}
-}
-
-func (cl *CampaignLogger) write(level slog.Level, msg string, args ...any) {
-	if cl.file == nil {
-		return
-	}
-
-	handler := slog.NewJSONHandler(cl.file, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})
-	logger := slog.New(handler)
-
-	switch level {
-	case slog.LevelDebug:
-		logger.Debug(msg, args...)
-	case slog.LevelInfo:
-		logger.Info(msg, args...)
-	case slog.LevelWarn:
-		logger.Warn(msg, args...)
-	case slog.LevelError:
-		logger.Error(msg, args...)
-	default:
-		logger.Info(msg, args...)
 	}
 }

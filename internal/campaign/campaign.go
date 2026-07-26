@@ -138,11 +138,24 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 		return fmt.Errorf("no recipients to send")
 	}
 
+	st.ClearEvents()
 	st.SetCSV(recipients)
 	st.SetTemplate(store.Template{
 		Subject: req.Subject,
 		Body:    req.Body,
 		To:      req.To,
+	})
+	st.SetConfig(store.CampaignConfig{
+		From:     req.From,
+		Provider: req.Provider,
+		SMTP:     req.SMTP,
+		SES:      req.SES,
+		Worker: config.WorkerConfig{
+			Concurrency:      req.Concurrency,
+			MaxRetries:       req.MaxRetries,
+			RetryBackoffBase: parseDurationOrZero(req.BackoffBase),
+			RetryBackoffMax:  parseDurationOrZero(req.BackoffMax),
+		},
 	})
 
 	sender, wp, err := buildSenderAndPool(defaultCfg, req)
@@ -150,9 +163,13 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 		return err
 	}
 
-	logger.LogConfig(email.SenderConfig{}, config.WorkerConfig{})
+	provider := req.Provider
+	if provider == "" {
+		provider = defaultCfg.Email.Provider
+	}
+	logger.Log("info", fmt.Sprintf("Campaign started — %d recipients, provider=%s", len(recipients), provider))
 	st.StartCampaign()
-	st.AddEvent("info", fmt.Sprintf("Campaign started — %d recipients", len(recipients)))
+	st.LogAndEvent("info", fmt.Sprintf("Campaign started — %d recipients", len(recipients)))
 
 	ctx, cancel := context.WithCancel(parentCtx)
 	st.SetCancelFn(cancel)
@@ -161,10 +178,9 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 		wp.Run(ctx, sender, st, logger)
 		if st.GetState() == store.StateRunning {
 			st.FinishCampaign()
-			st.AddEvent("info", "Campaign completed")
+			st.LogAndEvent("info", "Campaign completed")
 		}
 		logger.Close()
-		slog.Info("campaign completed")
 	}()
 
 	return nil
@@ -178,7 +194,7 @@ func ResumeCampaign(parentCtx context.Context, defaultCfg *config.Config, st *st
 	}
 
 	st.StartCampaign()
-	st.AddEvent("info", "Campaign resumed — processing remaining pending recipients")
+	st.LogAndEvent("info", "Campaign resumed — processing remaining pending recipients")
 
 	ctx, cancel := context.WithCancel(parentCtx)
 	st.SetCancelFn(cancel)
@@ -187,10 +203,9 @@ func ResumeCampaign(parentCtx context.Context, defaultCfg *config.Config, st *st
 		wp.RunPending(ctx, sender, st, logger)
 		if st.GetState() == store.StateRunning {
 			st.FinishCampaign()
-			st.AddEvent("info", "Campaign completed")
+			st.LogAndEvent("info", "Campaign completed")
 		}
 		logger.Close()
-		slog.Info("campaign completed after resume")
 	}()
 
 	return nil
@@ -251,4 +266,9 @@ func buildSenderAndPool(defaultCfg *config.Config, req CampaignRequest) (email.E
 
 func parseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
+}
+
+func parseDurationOrZero(s string) time.Duration {
+	d, _ := time.ParseDuration(s)
+	return d
 }

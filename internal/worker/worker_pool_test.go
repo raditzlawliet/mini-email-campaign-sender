@@ -48,9 +48,8 @@ func (m *mockSender) Send(to string, subject string, body string) error {
 
 type mockLogger struct{}
 
-func (m *mockLogger) LogRecipient(index int, status string, errMsg string, attempts int) {}
-func (m *mockLogger) LogRetry(index int, attempt int, maxRetries int, err error)         {}
-func (m *mockLogger) LogStatus(msg string, args ...any)                                  {}
+func (m *mockLogger) Log(level, msg string) {}
+func (m *mockLogger) Close()                {}
 
 func TestWorkerPool_Run(t *testing.T) {
 	t.Run("sends all emails successfully", func(t *testing.T) {

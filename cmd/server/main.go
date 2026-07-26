@@ -46,7 +46,7 @@ func main() {
 	h := handler.NewHandler(cfg, st)
 
 	app := fiber.New(fiber.Config{
-		AppName: "Mass Email Campaign Sender",
+		AppName: "Email Campaign Sender",
 	})
 
 	devMode := os.Getenv("DEV_MODE") == "true"
@@ -66,8 +66,7 @@ func main() {
 	app.Post("/api/campaign/start", h.HandleStart)
 	app.Post("/api/campaign/pause", h.HandlePause)
 	app.Post("/api/campaign/resume", h.HandleResume)
-	app.Get("/api/campaign/progress", h.HandleProgress)
-	app.Get("/api/campaign/log", h.HandleLog)
+	app.Get("/api/campaign/events", h.HandleEvents)
 	app.Post("/api/campaign/reset", h.HandleReset)
 
 	if !devMode {
