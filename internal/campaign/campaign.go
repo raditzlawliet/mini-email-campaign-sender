@@ -16,18 +16,21 @@ import (
 
 // CampaignRequest is the payload sent by the frontend for preview and start.
 type CampaignRequest struct {
-	CSV         string            `json:"csv"`
-	Subject     string            `json:"subject"`
-	Body        string            `json:"body"`
-	To          string            `json:"to"`
-	From        string            `json:"from"`
-	Provider    string            `json:"provider"`
-	SMTP        config.SMTPConfig `json:"smtp"`
-	SES         config.SESConfig  `json:"ses"`
-	Concurrency int               `json:"concurrency"`
-	MaxRetries  int               `json:"max_retries"`
-	BackoffBase string            `json:"retry_backoff_base"`
-	BackoffMax  string            `json:"retry_backoff_max"`
+	CSV            string            `json:"csv"`
+	Subject        string            `json:"subject"`
+	Body           string            `json:"body"`
+	To             string            `json:"to"`
+	From           string            `json:"from"`
+	Provider       string            `json:"provider"`
+	SMTP           config.SMTPConfig `json:"smtp"`
+	SES            config.SESConfig  `json:"ses"`
+	Concurrency    int               `json:"concurrency"`
+	MaxRetries     int               `json:"max_retries"`
+	SmtpBatchSize  int               `json:"smtp_batch_size"`
+	BackoffBase    string            `json:"retry_backoff_base"`
+	BackoffMax     string            `json:"retry_backoff_max"`
+	LogToFileValue string            `json:"log_to_file"` // "true" or "false"
+	VerboseValue   string            `json:"verbose"`     // "true" or "false"
 }
 
 // ParseCSV parses CSV text and returns recipients.
@@ -156,6 +159,9 @@ func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *sto
 			RetryBackoffBase: parseDurationOrZero(req.BackoffBase),
 			RetryBackoffMax:  parseDurationOrZero(req.BackoffMax),
 		},
+		SmtpBatchSize: req.SmtpBatchSize,
+		LogToFile:     req.LogToFileValue == "true",
+		Verbose:       req.VerboseValue == "true",
 	})
 
 	factory, wp, err := buildSenderFactory(defaultCfg, req)
@@ -226,6 +232,9 @@ func buildSenderFactory(defaultCfg *config.Config, req CampaignRequest) (email.S
 	}
 	if req.SMTP.Host != "" {
 		senderCfg.SMTP = req.SMTP
+	}
+	if req.SmtpBatchSize > 0 {
+		senderCfg.SMTP.BatchSize = req.SmtpBatchSize
 	}
 	if req.SES.Region != "" {
 		senderCfg.SES = req.SES

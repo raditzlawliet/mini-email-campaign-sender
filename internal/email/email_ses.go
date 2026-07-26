@@ -80,3 +80,6 @@ func (s *sesSender) Send(to string, subject string, body string) error {
 
 	return nil
 }
+
+// Flush is a no-op for SES (sends are immediate per call).
+func (s *sesSender) Flush() error { return nil }

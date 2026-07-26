@@ -44,11 +44,14 @@ type Template struct {
 
 // CampaignConfig holds per-campaign overrides.
 type CampaignConfig struct {
-	From     string              `json:"from"`
-	Provider string              `json:"provider"`
-	SMTP     config.SMTPConfig   `json:"smtp"`
-	SES      config.SESConfig    `json:"ses"`
-	Worker   config.WorkerConfig `json:"worker"`
+	From          string              `json:"from"`
+	Provider      string              `json:"provider"`
+	SMTP          config.SMTPConfig   `json:"smtp"`
+	SES           config.SESConfig    `json:"ses"`
+	Worker        config.WorkerConfig `json:"worker"`
+	SmtpBatchSize int                 `json:"smtp_batch_size"`
+	LogToFile     bool                `json:"log_to_file"`
+	Verbose       bool                `json:"verbose"`
 }
 
 // LogEntry is a single campaign log event.

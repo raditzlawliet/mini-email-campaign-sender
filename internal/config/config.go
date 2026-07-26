@@ -42,11 +42,12 @@ type EmailConfig struct {
 
 // SMTPConfig holds SMTP server connection details.
 type SMTPConfig struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	TLS      bool   `yaml:"tls"`
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
+	Username  string `yaml:"username"`
+	Password  string `yaml:"password"`
+	TLS       bool   `yaml:"tls"`
+	BatchSize int    `yaml:"batch_size"`
 }
 
 // SESConfig holds AWS SES connection details.

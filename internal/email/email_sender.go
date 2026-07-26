@@ -9,6 +9,8 @@ import (
 // EmailSender defines the interface for sending emails.
 type EmailSender interface {
 	Send(to string, subject string, body string) error
+	// Flush sends any batched/buffered messages. No-op for non-batched senders.
+	Flush() error
 }
 
 // SenderConfig holds the configuration needed to create an email sender.

@@ -3,6 +3,7 @@
     import EmailTemplate from "./EmailTemplate.svelte";
     import ProviderConfig from "./ProviderConfig.svelte";
     import WorkerConfig from "./WorkerConfig.svelte";
+    import LogConfig from "./LogConfig.svelte";
     import PreviewModal from "./PreviewModal.svelte";
     import {
         ChevronRight,
@@ -39,8 +40,13 @@
     // --- Worker ---
     let concurrency = $state(10);
     let maxRetries = $state(3);
+    let batchSize = $state(50);
     let backoffBase = $state("1s");
     let backoffMax = $state("30s");
+
+    // --- Log ---
+    let logToFile = $state(true);
+    let verbose = $state(false);
 
     // --- UI state ---
     let activeTab = $state("provider");
@@ -130,8 +136,11 @@
             sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
             concurrency = data.worker?.Concurrency || 10;
             maxRetries = data.worker?.MaxRetries || 3;
+            batchSize = data.email?.smtp?.BatchSize || 50;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
+            logToFile = data.log?.campaign?.log_to_file ?? true;
+            verbose = data.log?.campaign?.verbose ?? false;
 
             // Restore campaign session on refresh
             const camp = data.campaign;
@@ -157,6 +166,9 @@
                     if (c.ses?.SecretAccessKey) sesSecretAccessKey = c.ses.SecretAccessKey;
                     if (c.worker?.Concurrency) concurrency = c.worker.Concurrency;
                     if (c.worker?.MaxRetries) maxRetries = c.worker.MaxRetries;
+                    if (c.smtp_batch_size) batchSize = c.smtp_batch_size;
+                    if (c.log_to_file !== undefined) logToFile = c.log_to_file;
+                    if (c.verbose !== undefined) verbose = c.verbose;
                 }
                 // Restore progress and log
                 progress = camp.progress || progress;
@@ -196,8 +208,11 @@
         fd.append("ses_secret_access_key", sesSecretAccessKey);
         fd.append("concurrency", String(concurrency));
         fd.append("max_retries", String(maxRetries));
+        fd.append("smtp_batch_size", String(batchSize));
         fd.append("retry_backoff_base", backoffBase);
         fd.append("retry_backoff_max", backoffMax);
+        fd.append("log_to_file", String(logToFile));
+        fd.append("verbose", String(verbose));
         return fd;
     }
 
@@ -331,8 +346,22 @@
             const data = await apiGet("/api/campaign/config");
             concurrency = data.worker?.Concurrency || 10;
             maxRetries = data.worker?.MaxRetries || 3;
+            batchSize = data.email?.smtp?.BatchSize || 50;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
+        } catch (e) {
+            error = "Failed to reset defaults: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handleResetLog() {
+        saving = true;
+        try {
+            const data = await apiGet("/api/campaign/config");
+            logToFile = data.log?.campaign?.log_to_file ?? true;
+            verbose = data.log?.campaign?.verbose ?? false;
         } catch (e) {
             error = "Failed to reset defaults: " + e.message;
         } finally {
@@ -400,7 +429,12 @@
                 <button
                     role="tab"
                     class="tab {activeTab === 'worker' ? 'tab-active' : ''}"
-                    onclick={() => (activeTab = "worker")}>Worker Config</button
+                    onclick={() => (activeTab = "worker")}>Worker</button
+                >
+                <button
+                    role="tab"
+                    class="tab {activeTab === 'log' ? 'tab-active' : ''}"
+                    onclick={() => (activeTab = "log")}>Log</button
                 >
             </div>
 
@@ -420,14 +454,22 @@
                         disabled={campaignRunning}
                         onreset={handleResetProvider}
                     />
-                {:else}
+                {:else if activeTab === "worker"}
                     <WorkerConfig
                         bind:concurrency
                         bind:maxRetries
+                        bind:batchSize
                         bind:backoffBase
                         bind:backoffMax
                         disabled={campaignRunning}
                         onreset={handleResetWorker}
+                    />
+                {:else}
+                    <LogConfig
+                        bind:logToFile
+                        bind:verbose
+                        disabled={campaignRunning}
+                        onreset={handleResetLog}
                     />
                 {/if}
             </div>

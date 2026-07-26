@@ -44,6 +44,12 @@ func (h *Handler) HandleGetConfig(c fiber.Ctx) error {
 			"retry_backoff_base": h.DefaultConfig.Worker.RetryBackoffBase.String(),
 			"retry_backoff_max":  h.DefaultConfig.Worker.RetryBackoffMax.String(),
 		},
+		"log": map[string]any{
+			"campaign": map[string]any{
+				"log_to_file": h.DefaultConfig.Log.Campaign.LogToFile,
+				"verbose":     h.DefaultConfig.Log.Campaign.Verbose,
+			},
+		},
 		"campaign": map[string]any{
 			"state":    st.GetState(),
 			"progress": st.GetProgress(),
@@ -93,6 +99,12 @@ func (h *Handler) HandleStart(c fiber.Ctx) error {
 	req.CSV = csvText
 
 	logCfg := h.DefaultConfig.Log.Campaign
+	if req.LogToFileValue != "" {
+		logCfg.LogToFile = req.LogToFileValue == "true"
+	}
+	if req.VerboseValue != "" {
+		logCfg.Verbose = req.VerboseValue == "true"
+	}
 	h.Store.SetVerbose(logCfg.Verbose)
 
 	logger, err := campaign.NewCampaignLogger(".", logCfg.LogToFile, logCfg.Verbose)
@@ -119,13 +131,6 @@ func (h *Handler) HandleResume(c fiber.Ctx) error {
 	if !h.Store.IsPaused() {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "campaign is not paused"})
 	}
-	logCfg := h.DefaultConfig.Log.Campaign
-	h.Store.SetVerbose(logCfg.Verbose)
-
-	logger, err := campaign.NewCampaignLogger(".", logCfg.LogToFile, logCfg.Verbose)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to create campaign logger: " + err.Error()})
-	}
 	ctx := context.Background()
 	var req campaign.CampaignRequest
 	tmpl := h.Store.GetTemplate()
@@ -139,11 +144,26 @@ func (h *Handler) HandleResume(c fiber.Ctx) error {
 	req.SES = cfg.SES
 	req.Concurrency = cfg.Worker.Concurrency
 	req.MaxRetries = cfg.Worker.MaxRetries
+	req.SmtpBatchSize = cfg.SmtpBatchSize
 	if cfg.Worker.RetryBackoffBase > 0 {
 		req.BackoffBase = cfg.Worker.RetryBackoffBase.String()
 	}
 	if cfg.Worker.RetryBackoffMax > 0 {
 		req.BackoffMax = cfg.Worker.RetryBackoffMax.String()
+	}
+
+	logCfg := h.DefaultConfig.Log.Campaign
+	if cfg.LogToFile {
+		logCfg.LogToFile = cfg.LogToFile
+	}
+	if cfg.Verbose {
+		logCfg.Verbose = cfg.Verbose
+	}
+	h.Store.SetVerbose(logCfg.Verbose)
+
+	logger, err := campaign.NewCampaignLogger(".", logCfg.LogToFile, logCfg.Verbose)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to create campaign logger: " + err.Error()})
 	}
 	if err := campaign.ResumeCampaign(ctx, h.DefaultConfig, h.Store, req, logger); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": err.Error()})
@@ -207,6 +227,7 @@ func parseMultipart(c fiber.Ctx) (campaign.CampaignRequest, string, error) {
 	}
 
 	smtpPort, _ := strconv.Atoi(c.FormValue("smtp_port"))
+	smtpBatchSize, _ := strconv.Atoi(c.FormValue("smtp_batch_size"))
 
 	req := campaign.CampaignRequest{
 		Subject:  c.FormValue("subject"),
@@ -226,8 +247,11 @@ func parseMultipart(c fiber.Ctx) (campaign.CampaignRequest, string, error) {
 			AccessKeyID:     c.FormValue("ses_access_key_id"),
 			SecretAccessKey: c.FormValue("ses_secret_access_key"),
 		},
-		BackoffBase: c.FormValue("retry_backoff_base"),
-		BackoffMax:  c.FormValue("retry_backoff_max"),
+		SmtpBatchSize:  smtpBatchSize,
+		BackoffBase:    c.FormValue("retry_backoff_base"),
+		BackoffMax:     c.FormValue("retry_backoff_max"),
+		LogToFileValue: c.FormValue("log_to_file"),
+		VerboseValue:   c.FormValue("verbose"),
 	}
 
 	if v := c.FormValue("concurrency"); v != "" {

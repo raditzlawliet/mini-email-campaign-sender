@@ -105,6 +105,7 @@ func (wp *WorkerPool) worker(
 			return
 		case recipient, ok := <-queue:
 			if !ok {
+				_ = sender.Flush()
 				return
 			}
 			wp.processRecipient(ctx, workerID, recipient, sender, st, logger, sentCount, failedCount)

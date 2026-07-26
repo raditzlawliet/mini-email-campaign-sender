@@ -10,6 +10,7 @@ email:
     username: ""
     password: ""
     tls: false
+    batch_size: 50
   ses:
     region: "us-east-1"
     access_key_id: ""

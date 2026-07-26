@@ -47,6 +47,8 @@ func (m *mockSender) Send(to string, subject string, body string) error {
 	return nil
 }
 
+func (m *mockSender) Flush() error { return nil }
+
 type mockLogger struct{}
 
 func (m *mockLogger) Log(level, msg string) {}

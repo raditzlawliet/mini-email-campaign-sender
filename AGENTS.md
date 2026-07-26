@@ -87,7 +87,7 @@ frontend/
 
 - `slog` for all logging: `LevelError`/`LevelInfo`/`LevelDebug`.
 - Placeholders `{key}` rendered via `strings.NewReplacer`.
-- Worker pool: context cancellation, exponential backoff retry. Each worker goroutine creates its own `EmailSender` via `SenderFactory`, avoiding contention on a shared sender instance.
+- Worker pool: context cancellation, exponential backoff retry. Each worker goroutine creates its own `EmailSender` via `SenderFactory`. SMTP senders batch messages using a single `DialAndSend` call per batch (configurable `batch_size`, default 50). Flush on worker completion.
 - Pause: cancels context between sends (in-flight email completes gracefully). Resume: `RunPending` processes only `pending` recipients.
 - Unified logging: `Store.LogAndEvent(level, msg)` logs to both `slog` (console) and in-memory events (frontend). `CampaignLogger.Log(level, msg)` writes the same message to a JSON file per run.
 - Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`. Controlled by `log.campaign.log_to_file` in config.
