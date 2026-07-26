@@ -1,4 +1,4 @@
-# Email Campaign Sender
+# Mini Email Campaign Sender
 
 ## Overview
 

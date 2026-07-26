@@ -15,6 +15,9 @@ email:
     region: "us-east-1"
     access_key_id: ""
     secret_access_key: ""
+    use_template: false # use SES template instead of inline subject/body
+    template_name: "" # SES template name (required when use_template: true)
+    batch_size: 50 # emails per SendBulkTemplatedEmail call (1-50)
 
 worker:
   concurrency: 10
@@ -24,5 +27,5 @@ worker:
 
 log:
   campaign:
-    log_to_file: true   # write campaign events to logs/campaign_*.log
-    verbose: false       # include debug-level detail (per-email send/retry)
+    log_to_file: true # write campaign events to logs/campaign_*.log
+    verbose: false # include debug-level detail (per-email send/retry)

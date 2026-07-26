@@ -228,6 +228,7 @@ func parseMultipart(c fiber.Ctx) (campaign.CampaignRequest, string, error) {
 
 	smtpPort, _ := strconv.Atoi(c.FormValue("smtp_port"))
 	smtpBatchSize, _ := strconv.Atoi(c.FormValue("smtp_batch_size"))
+	sesBatchSize, _ := strconv.Atoi(c.FormValue("ses_batch_size"))
 
 	req := campaign.CampaignRequest{
 		Subject:  c.FormValue("subject"),
@@ -246,6 +247,9 @@ func parseMultipart(c fiber.Ctx) (campaign.CampaignRequest, string, error) {
 			Region:          c.FormValue("ses_region"),
 			AccessKeyID:     c.FormValue("ses_access_key_id"),
 			SecretAccessKey: c.FormValue("ses_secret_access_key"),
+			UseTemplate:     c.FormValue("ses_use_template") == "true",
+			TemplateName:    c.FormValue("ses_template_name"),
+			BatchSize:       sesBatchSize,
 		},
 		SmtpBatchSize:  smtpBatchSize,
 		BackoffBase:    c.FormValue("retry_backoff_base"),

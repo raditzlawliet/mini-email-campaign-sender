@@ -1,4 +1,4 @@
-# AGENTS.md — Email Campaign Sender
+# AGENTS.md — Mini Email Campaign Sender
 
 > AI agent configuration. Update as the project evolves. Keep it short.
 

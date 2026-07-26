@@ -142,7 +142,7 @@ func (wp *WorkerPool) processRecipient(
 		default:
 		}
 
-		lastErr = sender.Send(toAddr, subject, body)
+		lastErr = sender.Send(toAddr, subject, body, recipient.Data)
 		if lastErr == nil {
 			now := time.Now()
 			st.UpdateStatus(recipient.Index, store.RecipientStatus{

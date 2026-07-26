@@ -1,6 +1,10 @@
-# Email Campaign Sender
+# Mini Email Campaign Sender
 
-Send personalized email campaigns to millions of recipients via SMTP or Amazon SES, with real-time progress tracking, pause/resume, retry logic, and a clean web interface.
+Send personalized email campaigns via SMTP or Amazon SES, with real-time progress tracking, pause/resume, retry logic, and a clean web interface.
+
+<p align="center">
+  <img src="./docs/preview.png" alt="Preview">
+</p>
 
 ## Quick Start
 
@@ -32,6 +36,7 @@ email:
     username: ""
     password: ""
     tls: false
+    batch_size: 50
   ses:
     region: "us-east-1"
     access_key_id: ""
@@ -42,6 +47,11 @@ worker:
   max_retries: 3
   retry_backoff_base: "1s"
   retry_backoff_max: "30s"
+
+log:
+  campaign:
+    log_to_file: true
+    verbose: false
 ```
 
 All settings can be overridden per campaign in the web interface.

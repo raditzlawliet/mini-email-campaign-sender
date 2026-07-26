@@ -33,7 +33,7 @@ func (m *mockSender) setFailsFor(emailAddr string, count int) {
 	m.failsFor[emailAddr] = count
 }
 
-func (m *mockSender) Send(to string, subject string, body string) error {
+func (m *mockSender) Send(to string, subject string, body string, data map[string]string) error {
 	if m.delay > 0 {
 		time.Sleep(m.delay)
 	}

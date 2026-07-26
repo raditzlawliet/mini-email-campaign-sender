@@ -3,6 +3,7 @@
         toField = $bindable("{name} <{email}>"),
         subject = $bindable(""),
         body = $bindable(""),
+        useTemplate = false,
         disabled = false,
     } = $props();
 
@@ -46,42 +47,65 @@
             />
         </fieldset>
 
-        <fieldset class="fieldset">
-            <label class="label" for="tpl-subject">Subject</label>
-            <input
-                id="tpl-subject"
-                type="text"
-                class="input w-full"
-                placeholder="Hello {'{name}'}, welcome!"
-                bind:value={_subject}
-                onblur={flush}
-                {disabled}
-            />
-        </fieldset>
-
-        <fieldset class="fieldset">
-            <div class="flex items-center justify-between">
-                <label class="label" for="tpl-body">Body</label>
-                <button
-                    class="btn btn-ghost btn-xs"
-                    onclick={() => (bodyPreviewOpen = true)}
-                    title="Preview body">Preview</button
+        {#if useTemplate}
+            <div class="alert alert-info text-sm">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    class="stroke-current shrink-0 w-5 h-5"
                 >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                </svg>
+                <span>
+                    Subject and Body are defined by the SES template. Only the <strong
+                        >To</strong
+                    > field and CSV data columns are sent to SES as template variables.
+                </span>
             </div>
-            <textarea
-                id="tpl-body"
-                class="textarea w-full font-mono text-sm"
-                rows="6"
-                placeholder="Hi {'{name}'},&#10;&#10;Thanks for joining.&#10;&#10;Best regards"
-                bind:value={_body}
-                onblur={flush}
-                {disabled}></textarea>
-        </fieldset>
+        {:else}
+            <fieldset class="fieldset">
+                <label class="label" for="tpl-subject">Subject</label>
+                <input
+                    id="tpl-subject"
+                    type="text"
+                    class="input w-full"
+                    placeholder="Hello {'{name}'}, welcome!"
+                    bind:value={_subject}
+                    onblur={flush}
+                    {disabled}
+                />
+            </fieldset>
+
+            <fieldset class="fieldset">
+                <div class="flex items-center justify-between">
+                    <label class="label" for="tpl-body">Body</label>
+                    <button
+                        class="btn btn-ghost btn-xs"
+                        onclick={() => (bodyPreviewOpen = true)}
+                        title="Preview body">Preview</button
+                    >
+                </div>
+                <textarea
+                    id="tpl-body"
+                    class="textarea w-full font-mono text-sm"
+                    rows="6"
+                    placeholder="Hi {'{name}'},&#10;&#10;Thanks for joining.&#10;&#10;Best regards"
+                    bind:value={_body}
+                    onblur={flush}
+                    {disabled}></textarea>
+            </fieldset>
+        {/if}
     </div>
 </div>
 
 <!-- Body preview modal -->
-{#if bodyPreviewOpen}
+{#if !useTemplate && bodyPreviewOpen}
     <div class="modal modal-open" role="dialog" aria-modal="true">
         <div class="modal-box max-w-2xl w-11/12">
             <div class="flex items-center justify-between mb-4">

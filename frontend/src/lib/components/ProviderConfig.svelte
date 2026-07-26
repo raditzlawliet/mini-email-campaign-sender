@@ -11,6 +11,9 @@
         sesRegion = $bindable(""),
         sesAccessKeyId = $bindable(""),
         sesSecretAccessKey = $bindable(""),
+        sesUseTemplate = $bindable(false),
+        sesTemplateName = $bindable(""),
+        sesBatchSize = $bindable(50),
         disabled = false,
         onreset = () => {},
     } = $props();
@@ -149,6 +152,59 @@
                 {disabled}
             />
         </fieldset>
+
+        <div class="divider my-2"></div>
+
+        <fieldset class="fieldset">
+            <label class="label cursor-pointer justify-start gap-3">
+                <input
+                    type="checkbox"
+                    class="checkbox"
+                    bind:checked={sesUseTemplate}
+                    {disabled}
+                />
+                <span class="label-text"
+                    >Use SES Template (marketing emails)</span
+                >
+            </label>
+            <p class="fieldset-label text-base-content/50">
+                When enabled, Subject and Body are defined by the SES template.
+                CSV data columns become template variables.
+            </p>
+        </fieldset>
+
+        {#if sesUseTemplate}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 mt-2">
+                <fieldset class="fieldset">
+                    <label class="label" for="cfg-ses-tpl-name"
+                        >Template Name</label
+                    >
+                    <input
+                        id="cfg-ses-tpl-name"
+                        type="text"
+                        class="input w-full"
+                        placeholder="marketing-v2"
+                        bind:value={sesTemplateName}
+                        {disabled}
+                    />
+                </fieldset>
+                <fieldset class="fieldset">
+                    <label class="label" for="cfg-ses-batch">Batch Size</label>
+                    <input
+                        id="cfg-ses-batch"
+                        type="number"
+                        class="input w-full"
+                        min="1"
+                        max="50"
+                        bind:value={sesBatchSize}
+                        {disabled}
+                    />
+                    <p class="fieldset-label">
+                        Emails per SES Bulk API call (1–50)
+                    </p>
+                </fieldset>
+            </div>
+        {/if}
     {/if}
 
     <div class="flex justify-end mt-2">

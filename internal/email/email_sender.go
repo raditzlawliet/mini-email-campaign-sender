@@ -8,7 +8,9 @@ import (
 
 // EmailSender defines the interface for sending emails.
 type EmailSender interface {
-	Send(to string, subject string, body string) error
+	// Send delivers an email. For template-based senders (e.g. SES templates),
+	// subject and body may be ignored and data used as template variables instead.
+	Send(to string, subject string, body string, data map[string]string) error
 	// Flush sends any batched/buffered messages. No-op for non-batched senders.
 	Flush() error
 }

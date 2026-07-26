@@ -37,6 +37,9 @@
     let sesRegion = $state("");
     let sesAccessKeyId = $state("");
     let sesSecretAccessKey = $state("");
+    let sesUseTemplate = $state(false);
+    let sesTemplateName = $state("");
+    let sesBatchSize = $state(50);
 
     // --- Worker ---
     let concurrency = $state(10);
@@ -135,6 +138,9 @@
             sesRegion = data.email.ses?.Region || "";
             sesAccessKeyId = data.email.ses?.AccessKeyID || "";
             sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
+            sesUseTemplate = data.email.ses?.UseTemplate || false;
+            sesTemplateName = data.email.ses?.TemplateName || "";
+            sesBatchSize = data.email.ses?.BatchSize || 50;
             concurrency = data.worker?.Concurrency || 10;
             maxRetries = data.worker?.MaxRetries || 3;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
@@ -163,8 +169,15 @@
                     if (c.smtp?.TLS !== undefined) smtpTLS = c.smtp.TLS;
                     if (c.ses?.Region) sesRegion = c.ses.Region;
                     if (c.ses?.AccessKeyID) sesAccessKeyId = c.ses.AccessKeyID;
-                    if (c.ses?.SecretAccessKey) sesSecretAccessKey = c.ses.SecretAccessKey;
-                    if (c.worker?.Concurrency) concurrency = c.worker.Concurrency;
+                    if (c.ses?.SecretAccessKey)
+                        sesSecretAccessKey = c.ses.SecretAccessKey;
+                    if (c.ses?.UseTemplate !== undefined)
+                        sesUseTemplate = c.ses.UseTemplate;
+                    if (c.ses?.TemplateName)
+                        sesTemplateName = c.ses.TemplateName;
+                    if (c.ses?.BatchSize) sesBatchSize = c.ses.BatchSize;
+                    if (c.worker?.Concurrency)
+                        concurrency = c.worker.Concurrency;
                     if (c.worker?.MaxRetries) maxRetries = c.worker.MaxRetries;
                     if (c.smtp_batch_size) smtpBatchSize = c.smtp_batch_size;
                     if (c.log_to_file !== undefined) logToFile = c.log_to_file;
@@ -173,7 +186,10 @@
                 // Restore progress and log
                 progress = camp.progress || progress;
                 logEvents = camp.events || [];
-                logOpen = camp.state === "running" || camp.state === "paused" || camp.state === "completed";
+                logOpen =
+                    camp.state === "running" ||
+                    camp.state === "paused" ||
+                    camp.state === "completed";
             }
         } catch (e) {
             error = "Failed to load config: " + e.message;
@@ -206,6 +222,9 @@
         fd.append("ses_region", sesRegion);
         fd.append("ses_access_key_id", sesAccessKeyId);
         fd.append("ses_secret_access_key", sesSecretAccessKey);
+        fd.append("ses_use_template", String(sesUseTemplate));
+        fd.append("ses_template_name", sesTemplateName);
+        fd.append("ses_batch_size", String(sesBatchSize));
         fd.append("concurrency", String(concurrency));
         fd.append("max_retries", String(maxRetries));
         fd.append("smtp_batch_size", String(smtpBatchSize));
@@ -249,7 +268,9 @@
         };
     }
 
-    $effect(() => { initSSE(); });
+    $effect(() => {
+        initSSE();
+    });
 
     async function handleStart() {
         if (!manualMode && !csvFile) {
@@ -334,6 +355,9 @@
             sesRegion = data.email.ses?.Region || "";
             sesAccessKeyId = data.email.ses?.AccessKeyID || "";
             sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
+            sesUseTemplate = data.email.ses?.UseTemplate || false;
+            sesTemplateName = data.email.ses?.TemplateName || "";
+            sesBatchSize = data.email.ses?.BatchSize || 50;
         } catch (e) {
             error = "Failed to reset defaults: " + e.message;
         } finally {
@@ -414,6 +438,7 @@
             bind:toField
             bind:subject
             bind:body
+            useTemplate={sesUseTemplate}
             disabled={campaignRunning}
         />
 
@@ -452,6 +477,9 @@
                         bind:sesRegion
                         bind:sesAccessKeyId
                         bind:sesSecretAccessKey
+                        bind:sesUseTemplate
+                        bind:sesTemplateName
+                        bind:sesBatchSize
                         disabled={campaignRunning}
                         onreset={handleResetProvider}
                     />
@@ -482,7 +510,9 @@
                     <button
                         class="btn btn-outline"
                         onclick={handlePreview}
-                        disabled={saving || (!manualMode && !csvFile && !csvText.trim()) || campaignRunning}
+                        disabled={saving ||
+                            (!manualMode && !csvFile && !csvText.trim()) ||
+                            campaignRunning}
                     >
                         {#if saving}<span
                                 class="loading loading-spinner loading-xs"
@@ -509,7 +539,9 @@
                     <button
                         class="btn btn-primary"
                         onclick={handleStart}
-                        disabled={saving || (!manualMode && !csvFile && !csvText.trim()) || campaignRunning}
+                        disabled={saving ||
+                            (!manualMode && !csvFile && !csvText.trim()) ||
+                            campaignRunning}
                     >
                         {#if campaignRunning}<span
                                 class="loading loading-spinner loading-xs"

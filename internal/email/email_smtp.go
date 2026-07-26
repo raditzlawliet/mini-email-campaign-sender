@@ -67,7 +67,7 @@ func NewSMTPSender(from string, cfg config.SMTPConfig) (EmailSender, error) {
 
 // Send builds a message and appends it to the batch.
 // It auto-flushes when the batch reaches the configured size.
-func (s *smtpSender) Send(to string, subject string, body string) error {
+func (s *smtpSender) Send(to string, subject string, body string, data map[string]string) error {
 	msg := mail.NewMsg()
 	if err := msg.From(s.from); err != nil {
 		return fmt.Errorf("setting from address: %w", err)

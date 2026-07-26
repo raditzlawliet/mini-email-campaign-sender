@@ -32,6 +32,9 @@ email:
     region: eu-west-1
     access_key_id: AKIATEST
     secret_access_key: secret
+    use_template: true
+    template_name: my-template
+    batch_size: 40
 worker:
   concurrency: 5
   max_retries: 2
@@ -54,6 +57,9 @@ worker:
 		assert.Equal("eu-west-1", cfg.Email.SES.Region)
 		assert.Equal("AKIATEST", cfg.Email.SES.AccessKeyID)
 		assert.Equal("secret", cfg.Email.SES.SecretAccessKey)
+		assert.True(cfg.Email.SES.UseTemplate)
+		assert.Equal("my-template", cfg.Email.SES.TemplateName)
+		assert.Equal(40, cfg.Email.SES.BatchSize)
 		assert.Equal(5, cfg.Worker.Concurrency)
 		assert.Equal(2, cfg.Worker.MaxRetries)
 		assert.Equal(2*time.Second, cfg.Worker.RetryBackoffBase)

@@ -55,6 +55,9 @@ type SESConfig struct {
 	Region          string `yaml:"region"`
 	AccessKeyID     string `yaml:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key"`
+	UseTemplate     bool   `yaml:"use_template"`
+	TemplateName    string `yaml:"template_name"`
+	BatchSize       int    `yaml:"batch_size"`
 }
 
 // WorkerConfig holds worker pool and retry settings.
