@@ -35,6 +35,23 @@ type RunResult struct {
 // Run starts the worker pool to process all recipients.
 func (wp *WorkerPool) Run(ctx context.Context, sender email.EmailSender, st *store.Store, logger CampaignLogWriter) RunResult {
 	recipients := st.GetRecipients()
+	return wp.processRecipients(ctx, sender, st, logger, recipients)
+}
+
+// RunPending starts the worker pool to process only pending recipients.
+func (wp *WorkerPool) RunPending(ctx context.Context, sender email.EmailSender, st *store.Store, logger CampaignLogWriter) RunResult {
+	all := st.GetRecipients()
+	statuses := st.GetAllStatuses()
+	var pending []store.Recipient
+	for i, r := range all {
+		if i < len(statuses) && statuses[i].Status == "pending" {
+			pending = append(pending, r)
+		}
+	}
+	return wp.processRecipients(ctx, sender, st, logger, pending)
+}
+
+func (wp *WorkerPool) processRecipients(ctx context.Context, sender email.EmailSender, st *store.Store, logger CampaignLogWriter, recipients []store.Recipient) RunResult {
 	if len(recipients) == 0 {
 		return RunResult{}
 	}
@@ -49,7 +66,6 @@ func (wp *WorkerPool) Run(ctx context.Context, sender email.EmailSender, st *sto
 	var sentCount, failedCount int
 	var mu sync.Mutex
 
-	// Start workers.
 	for i := 0; i < wp.Concurrency; i++ {
 		wg.Add(1)
 		go func(workerID int) {
@@ -60,22 +76,16 @@ func (wp *WorkerPool) Run(ctx context.Context, sender email.EmailSender, st *sto
 
 	wg.Wait()
 
-	slog.Info("campaign finished", "sent", sentCount, "failed", failedCount)
-	logger.LogStatus("campaign finished", "sent", sentCount, "failed", failedCount)
+	slog.Info("campaign batch finished", "sent", sentCount, "failed", failedCount)
+	logger.LogStatus("campaign batch finished", "sent", sentCount, "failed", failedCount)
 
 	return RunResult{Sent: sentCount, Failed: failedCount}
 }
 
 func (wp *WorkerPool) worker(
-	ctx context.Context,
-	workerID int,
-	queue <-chan store.Recipient,
-	sender email.EmailSender,
-	st *store.Store,
-	logger CampaignLogWriter,
-	sentCount *int,
-	failedCount *int,
-	mu *sync.Mutex,
+	ctx context.Context, workerID int, queue <-chan store.Recipient,
+	sender email.EmailSender, st *store.Store, logger CampaignLogWriter,
+	sentCount *int, failedCount *int, mu *sync.Mutex,
 ) {
 	for {
 		select {
@@ -92,15 +102,9 @@ func (wp *WorkerPool) worker(
 }
 
 func (wp *WorkerPool) processRecipient(
-	ctx context.Context,
-	workerID int,
-	recipient store.Recipient,
-	sender email.EmailSender,
-	st *store.Store,
-	logger CampaignLogWriter,
-	sentCount *int,
-	failedCount *int,
-	mu *sync.Mutex,
+	ctx context.Context, workerID int, recipient store.Recipient,
+	sender email.EmailSender, st *store.Store, logger CampaignLogWriter,
+	sentCount *int, failedCount *int, mu *sync.Mutex,
 ) {
 	tmpl := st.GetTemplate()
 	toAddr := email.Render(tmpl.To, recipient.Data)
@@ -119,8 +123,7 @@ func (wp *WorkerPool) processRecipient(
 		select {
 		case <-ctx.Done():
 			st.UpdateStatus(recipient.Index, store.RecipientStatus{
-				Status:   "failed",
-				Error:    "campaign cancelled",
+				Status:   "pending",
 				Attempts: attempts,
 			})
 			return
@@ -136,28 +139,18 @@ func (wp *WorkerPool) processRecipient(
 				SentAt:   &now,
 			})
 			logger.LogRecipient(recipient.Index, "sent", "", attempts)
+			st.AddEvent("info", fmt.Sprintf("✓ Sent to %s (%d attempt(s))", recipient.Email, attempts))
 
 			mu.Lock()
 			*sentCount++
 			mu.Unlock()
 
-			slog.Debug("email sent",
-				"workerID", workerID,
-				"index", recipient.Index,
-				"email", recipient.Email,
-				"attempts", attempts,
-			)
+			slog.Debug("email sent", "workerID", workerID, "index", recipient.Index, "email", recipient.Email, "attempts", attempts)
 			return
 		}
 
 		logger.LogRetry(recipient.Index, attempts, wp.MaxRetries, lastErr)
-		slog.Warn("email send failed, retrying",
-			"workerID", workerID,
-			"index", recipient.Index,
-			"email", recipient.Email,
-			"attempt", attempts,
-			"error", lastErr,
-		)
+		slog.Warn("email send failed, retrying", "workerID", workerID, "index", recipient.Index, "email", recipient.Email, "attempt", attempts, "error", lastErr)
 
 		if attempts < wp.MaxRetries {
 			backoff := wp.BackoffBase * time.Duration(1<<(attempts-1))
@@ -168,8 +161,7 @@ func (wp *WorkerPool) processRecipient(
 			select {
 			case <-ctx.Done():
 				st.UpdateStatus(recipient.Index, store.RecipientStatus{
-					Status:   "failed",
-					Error:    "campaign cancelled",
+					Status:   "pending",
 					Attempts: attempts,
 				})
 				return
@@ -178,22 +170,18 @@ func (wp *WorkerPool) processRecipient(
 		}
 	}
 
+	errMsg := fmt.Sprintf("all %d attempts failed: %v", wp.MaxRetries, lastErr)
 	st.UpdateStatus(recipient.Index, store.RecipientStatus{
 		Status:   "failed",
-		Error:    fmt.Sprintf("all %d attempts failed: %v", wp.MaxRetries, lastErr),
+		Error:    errMsg,
 		Attempts: attempts,
 	})
-	logger.LogRecipient(recipient.Index, "failed", fmt.Sprintf("all %d attempts failed: %v", wp.MaxRetries, lastErr), attempts)
+	logger.LogRecipient(recipient.Index, "failed", errMsg, attempts)
+	st.AddEvent("error", fmt.Sprintf("✗ Failed: %s — %s", recipient.Email, errMsg))
 
 	mu.Lock()
 	*failedCount++
 	mu.Unlock()
 
-	slog.Error("email failed after all retries",
-		"workerID", workerID,
-		"index", recipient.Index,
-		"email", recipient.Email,
-		"attempts", attempts,
-		"error", lastErr,
-	)
+	slog.Error("email failed after all retries", "workerID", workerID, "index", recipient.Index, "email", recipient.Email, "attempts", attempts, "error", lastErr)
 }

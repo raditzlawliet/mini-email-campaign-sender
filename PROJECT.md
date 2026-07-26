@@ -14,6 +14,7 @@ System to send a single promotional email campaign to **1,000,000 recipients**, 
   - Support overwrite configure worker that already configure.
   - Dry-run / preview mode to test email content without sending.
   - Reset button to clear the campaign and start over.
+  - Pause/Resume button to pause and resume the campaign.
 - Queue-based processing to handle the volume of emails efficiently that can be resumed.
   - Worker pool or async I/O to maximize throughput.
   - In-memory store to mark per-recipient status (pending, sent, failed) for final delivery tracking report.

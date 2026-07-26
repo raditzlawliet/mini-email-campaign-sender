@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ const (
 	StateIdle      CampaignState = "idle"
 	StateReady     CampaignState = "ready"
 	StateRunning   CampaignState = "running"
+	StatePaused    CampaignState = "paused"
 	StateCompleted CampaignState = "completed"
 )
 
@@ -48,6 +50,13 @@ type CampaignConfig struct {
 	Worker   config.WorkerConfig `json:"worker"`
 }
 
+// LogEntry is a single campaign log event.
+type LogEntry struct {
+	Time    string `json:"time"`
+	Level   string `json:"level"` // info, warn, error
+	Message string `json:"message"`
+}
+
 // Store is a thread-safe in-memory store for campaign data.
 type Store struct {
 	mu sync.RWMutex
@@ -57,6 +66,8 @@ type Store struct {
 	template   Template
 	config     CampaignConfig
 	state      CampaignState
+	events     []LogEntry
+	cancelFn   context.CancelFunc
 }
 
 var (
@@ -75,6 +86,7 @@ func InitStore() {
 		globalStore = &Store{
 			recipients: []Recipient{},
 			statuses:   []RecipientStatus{},
+			events:     []LogEntry{},
 			state:      StateIdle,
 		}
 	})
@@ -104,22 +116,6 @@ func (s *Store) SetConfig(c CampaignConfig) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.config = c
-}
-
-// SetProviderOverride sets only the provider and provider-specific config.
-func (s *Store) SetProviderOverride(provider string, smtp config.SMTPConfig, ses config.SESConfig) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.config.Provider = provider
-	s.config.SMTP = smtp
-	s.config.SES = ses
-}
-
-// SetWorkerOverride sets only the worker config override.
-func (s *Store) SetWorkerOverride(w config.WorkerConfig) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.config.Worker = w
 }
 
 // StartCampaign transitions state to running.
@@ -184,6 +180,62 @@ func (s *Store) GetState() CampaignState {
 	return s.state
 }
 
+// SetCancelFn stores the cancel function for the current campaign context.
+func (s *Store) SetCancelFn(fn context.CancelFunc) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cancelFn = fn
+}
+
+// Pause cancels the current campaign context and sets state to paused.
+func (s *Store) Pause() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelFn != nil {
+		s.cancelFn()
+		s.cancelFn = nil
+	}
+	s.state = StatePaused
+}
+
+// IsRunning returns true if campaign is currently running.
+func (s *Store) IsRunning() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state == StateRunning
+}
+
+// IsPaused returns true if campaign is paused.
+func (s *Store) IsPaused() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state == StatePaused
+}
+
+// AddEvent appends a log event.
+func (s *Store) AddEvent(level, message string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, LogEntry{
+		Time:    time.Now().Format(time.RFC3339),
+		Level:   level,
+		Message: message,
+	})
+	// Keep max 500 events in memory
+	if len(s.events) > 500 {
+		s.events = s.events[len(s.events)-500:]
+	}
+}
+
+// GetEvents returns a copy of all log events.
+func (s *Store) GetEvents() []LogEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]LogEntry, len(s.events))
+	copy(result, s.events)
+	return result
+}
+
 // Reset clears all stored data and resets state to idle.
 func (s *Store) Reset() {
 	s.mu.Lock()
@@ -192,7 +244,12 @@ func (s *Store) Reset() {
 	s.statuses = []RecipientStatus{}
 	s.template = Template{}
 	s.config = CampaignConfig{}
+	s.events = []LogEntry{}
 	s.state = StateIdle
+	if s.cancelFn != nil {
+		s.cancelFn()
+		s.cancelFn = nil
+	}
 }
 
 // Progress holds campaign progress counters.

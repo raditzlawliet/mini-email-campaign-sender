@@ -47,11 +47,26 @@
         state: "idle",
     });
     let campaignRunning = $derived(
-        progress.state === "running" || progress.state === "ready",
+        progress.state === "running" || progress.state === "ready" || progress.state === "paused",
     );
     let loading = $state(true);
     let error = $state("");
     let saving = $state(false);
+
+    // --- Log ---
+    let logEvents = $state([]);
+    let logOpen = $state(false);
+    let logRef = $state(null);
+
+    $effect(() => {
+        if (logRef && logEvents.length) {
+            const el = logRef;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+            if (atBottom || logEvents.length <= 1) {
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+    });
 
     let progressPercent = $derived(
         progress.total > 0
@@ -152,6 +167,7 @@
     }
 
     let progressInterval;
+    let logInterval;
     async function handleStart() {
         if (!csvText.trim()) {
             error = "Please provide CSV data first.";
@@ -175,8 +191,40 @@
                     /* ignore */
                 }
             }, 1000);
+            // Log polling
+            logOpen = true;
+            logInterval = setInterval(async () => {
+                try {
+                    const data = await apiGet("/api/campaign/log");
+                    logEvents = data.events || [];
+                } catch (e) { /* ignore */ }
+            }, 2000);
         } catch (e) {
             error = "Start failed: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handlePause() {
+        saving = true;
+        try {
+            await apiPost("/api/campaign/pause", {});
+        } catch (e) {
+            error = "Pause failed: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handleResume() {
+        saving = true;
+        error = "";
+        try {
+            await apiPost("/api/campaign/resume", {});
+            progress.state = "running";
+        } catch (e) {
+            error = "Resume failed: " + e.message;
         } finally {
             saving = false;
         }
@@ -195,6 +243,9 @@
                 state: "idle",
             };
             clearInterval(progressInterval);
+            clearInterval(logInterval);
+            logEvents = [];
+            logOpen = false;
         } catch (e) {
             error = "Reset failed: " + e.message;
         } finally {
@@ -334,31 +385,26 @@
             <div class="card-body">
                 <h2 class="card-title text-lg">Actions</h2>
                 <div class="flex flex-wrap gap-3">
-                    <button
-                        class="btn btn-outline"
-                        onclick={handlePreview}
-                        disabled={saving || !csvText.trim() || campaignRunning}
-                    >
-                        {#if saving}<span
-                                class="loading loading-spinner loading-xs"
-                            ></span>{/if}
+                    <button class="btn btn-outline" onclick={handlePreview}
+                        disabled={saving || !csvText.trim() || campaignRunning}>
+                        {#if saving}<span class="loading loading-spinner loading-xs"></span>{/if}
                         Dry-Run Preview
                     </button>
-                    <button
-                        class="btn btn-primary"
-                        onclick={handleStart}
-                        disabled={saving || !csvText.trim() || campaignRunning}
-                    >
-                        {#if campaignRunning}<span
-                                class="loading loading-spinner loading-xs"
-                            ></span>{/if}
+                    {#if progress.state === "running"}
+                        <button class="btn btn-warning" onclick={handlePause} disabled={saving}>
+                            ⏸ Pause
+                        </button>
+                    {:else if progress.state === "paused"}
+                        <button class="btn btn-success" onclick={handleResume} disabled={saving}>
+                            ▶ Resume
+                        </button>
+                    {/if}
+                    <button class="btn btn-primary" onclick={handleStart}
+                        disabled={saving || !csvText.trim() || campaignRunning}>
+                        {#if campaignRunning}<span class="loading loading-spinner loading-xs"></span>{/if}
                         Start Campaign
                     </button>
-                    <button
-                        class="btn btn-ghost"
-                        onclick={handleReset}
-                        disabled={saving}
-                    >
+                    <button class="btn btn-ghost" onclick={handleReset} disabled={saving}>
                         Reset
                     </button>
                 </div>
@@ -378,6 +424,8 @@
                         Progress
                         {#if progress.state === "running"}
                             <span class="badge badge-info">Running</span>
+                        {:else if progress.state === "paused"}
+                            <span class="badge badge-warning">Paused</span>
                         {:else if progress.state === "completed"}
                             <span class="badge badge-success">Completed</span>
                         {:else}
@@ -418,6 +466,31 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Log -->
+            <div class="card bg-base-100 shadow-sm mt-4">
+                <div class="card-body p-3">
+                    <button class="flex items-center justify-between w-full text-sm font-semibold"
+                        onclick={() => (logOpen = !logOpen)}>
+                        <span>Campaign Log ({logEvents.length})</span>
+                        <span class="text-xs">{logOpen ? '▼' : '▶'}</span>
+                    </button>
+                    {#if logOpen}
+                        <div class="bg-base-300 rounded-box p-2 max-h-48 overflow-y-auto font-mono text-xs space-y-0.5" bind:this={logRef}>
+                            {#if logEvents.length === 0}
+                                <span class="text-base-content/40">Waiting for events...</span>
+                            {:else}
+                                {#each logEvents as ev}
+                                    <div class="flex gap-2">
+                                        <span class="text-base-content/40 shrink-0">{ev.time?.slice(11, 19) || ''}</span>
+                                        <span class={ev.level === 'error' ? 'text-error' : ev.level === 'warn' ? 'text-warning' : 'text-base-content'}>{ev.message}</span>
+                                    </div>
+                                {/each}
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             </div>
         {/if}

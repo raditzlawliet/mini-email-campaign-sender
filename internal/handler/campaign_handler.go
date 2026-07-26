@@ -86,8 +86,7 @@ func (h *Handler) HandleStart(c fiber.Ctx) error {
 		})
 	}
 
-	state := h.Store.GetState()
-	if state == store.StateRunning {
+	if h.Store.IsRunning() {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{
 			"error": "campaign is already running",
 		})
@@ -112,10 +111,79 @@ func (h *Handler) HandleStart(c fiber.Ctx) error {
 	})
 }
 
+// HandlePause pauses the running campaign.
+func (h *Handler) HandlePause(c fiber.Ctx) error {
+	if !h.Store.IsRunning() {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{
+			"error": "campaign is not running",
+		})
+	}
+
+	h.Store.Pause()
+	h.Store.AddEvent("info", "Campaign paused")
+
+	return c.JSON(map[string]any{
+		"status": "paused",
+	})
+}
+
+// HandleResume resumes a paused campaign.
+func (h *Handler) HandleResume(c fiber.Ctx) error {
+	if !h.Store.IsPaused() {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{
+			"error": "campaign is not paused",
+		})
+	}
+
+	logger, err := campaign.NewCampaignLogger(".")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{
+			"error": "failed to create campaign logger: " + err.Error(),
+		})
+	}
+
+	ctx := context.Background()
+
+	// Build a minimal request from stored data — we use the default config + current state
+	var req campaign.CampaignRequest
+	tmpl := h.Store.GetTemplate()
+	cfg := h.Store.GetConfig()
+	req.Subject = tmpl.Subject
+	req.Body = tmpl.Body
+	req.To = tmpl.To
+	req.From = cfg.From
+	req.Provider = cfg.Provider
+	req.SMTP = cfg.SMTP
+	req.SES = cfg.SES
+	req.Concurrency = cfg.Worker.Concurrency
+	req.MaxRetries = cfg.Worker.MaxRetries
+
+	if err := campaign.ResumeCampaign(ctx, h.DefaultConfig, h.Store, req, logger); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(map[string]any{
+		"status": "resumed",
+	})
+}
+
 // HandleProgress returns current campaign progress.
 func (h *Handler) HandleProgress(c fiber.Ctx) error {
 	progress := h.Store.GetProgress()
 	return c.JSON(progress)
+}
+
+// HandleLog returns campaign log events.
+func (h *Handler) HandleLog(c fiber.Ctx) error {
+	events := h.Store.GetEvents()
+	if events == nil {
+		events = []store.LogEntry{}
+	}
+	return c.JSON(map[string]any{
+		"events": events,
+	})
 }
 
 // HandleReset clears all campaign data.

@@ -129,7 +129,7 @@ func Preview(req CampaignRequest, count int) ([]PreviewResult, error) {
 }
 
 // StartCampaign parses CSV, stores it, then runs the campaign with worker pool.
-func StartCampaign(ctx context.Context, defaultCfg *config.Config, st *store.Store, req CampaignRequest, logger *CampaignLogger) error {
+func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *store.Store, req CampaignRequest, logger *CampaignLogger) error {
 	recipients, err := ParseCSV(req.CSV)
 	if err != nil {
 		return fmt.Errorf("parsing CSV: %w", err)
@@ -138,7 +138,6 @@ func StartCampaign(ctx context.Context, defaultCfg *config.Config, st *store.Sto
 		return fmt.Errorf("no recipients to send")
 	}
 
-	// Build template and store recipients (in-memory only, for progress tracking)
 	st.SetCSV(recipients)
 	st.SetTemplate(store.Template{
 		Subject: req.Subject,
@@ -146,7 +145,58 @@ func StartCampaign(ctx context.Context, defaultCfg *config.Config, st *store.Sto
 		To:      req.To,
 	})
 
-	// Resolve sender config: defaults + request overrides
+	sender, wp, err := buildSenderAndPool(defaultCfg, req)
+	if err != nil {
+		return err
+	}
+
+	logger.LogConfig(email.SenderConfig{}, config.WorkerConfig{})
+	st.StartCampaign()
+	st.AddEvent("info", fmt.Sprintf("Campaign started — %d recipients", len(recipients)))
+
+	ctx, cancel := context.WithCancel(parentCtx)
+	st.SetCancelFn(cancel)
+
+	go func() {
+		wp.Run(ctx, sender, st, logger)
+		if st.GetState() == store.StateRunning {
+			st.FinishCampaign()
+			st.AddEvent("info", "Campaign completed")
+		}
+		logger.Close()
+		slog.Info("campaign completed")
+	}()
+
+	return nil
+}
+
+// ResumeCampaign restarts the worker pool for only pending recipients.
+func ResumeCampaign(parentCtx context.Context, defaultCfg *config.Config, st *store.Store, req CampaignRequest, logger *CampaignLogger) error {
+	sender, wp, err := buildSenderAndPool(defaultCfg, req)
+	if err != nil {
+		return err
+	}
+
+	st.StartCampaign()
+	st.AddEvent("info", "Campaign resumed — processing remaining pending recipients")
+
+	ctx, cancel := context.WithCancel(parentCtx)
+	st.SetCancelFn(cancel)
+
+	go func() {
+		wp.RunPending(ctx, sender, st, logger)
+		if st.GetState() == store.StateRunning {
+			st.FinishCampaign()
+			st.AddEvent("info", "Campaign completed")
+		}
+		logger.Close()
+		slog.Info("campaign completed after resume")
+	}()
+
+	return nil
+}
+
+func buildSenderAndPool(defaultCfg *config.Config, req CampaignRequest) (email.EmailSender, *worker.WorkerPool, error) {
 	senderCfg := email.SenderConfig{
 		Provider: defaultCfg.Email.Provider,
 		From:     defaultCfg.Email.From,
@@ -168,10 +218,9 @@ func StartCampaign(ctx context.Context, defaultCfg *config.Config, st *store.Sto
 
 	sender, err := email.NewSender(senderCfg)
 	if err != nil {
-		return fmt.Errorf("creating email sender: %w", err)
+		return nil, nil, fmt.Errorf("creating email sender: %w", err)
 	}
 
-	// Resolve worker config: defaults + request overrides
 	workerCfg := defaultCfg.Worker
 	if req.Concurrency > 0 {
 		workerCfg.Concurrency = req.Concurrency
@@ -197,17 +246,7 @@ func StartCampaign(ctx context.Context, defaultCfg *config.Config, st *store.Sto
 		BackoffMax:  workerCfg.RetryBackoffMax,
 	}
 
-	logger.LogConfig(senderCfg, workerCfg)
-	st.StartCampaign()
-
-	go func() {
-		wp.Run(ctx, sender, st, logger)
-		st.FinishCampaign()
-		logger.Close()
-		slog.Info("campaign completed")
-	}()
-
-	return nil
+	return sender, wp, nil
 }
 
 func parseDuration(s string) (time.Duration, error) {

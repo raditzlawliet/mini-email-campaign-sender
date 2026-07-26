@@ -60,11 +60,14 @@ func main() {
 		slog.Info("DEV_MODE enabled — API only, CORS allowed for http://localhost:5173")
 	}
 
-	// API routes — 5 endpoints
+	// API routes
 	app.Get("/api/campaign/config", h.HandleGetConfig)
 	app.Post("/api/campaign/preview", h.HandlePreview)
 	app.Post("/api/campaign/start", h.HandleStart)
+	app.Post("/api/campaign/pause", h.HandlePause)
+	app.Post("/api/campaign/resume", h.HandleResume)
 	app.Get("/api/campaign/progress", h.HandleProgress)
+	app.Get("/api/campaign/log", h.HandleLog)
 	app.Post("/api/campaign/reset", h.HandleReset)
 
 	if !devMode {
