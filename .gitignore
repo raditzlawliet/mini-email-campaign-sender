@@ -1,0 +1,7 @@
+bin/
+frontend/dist/
+frontend/node_modules/
+cmd/server/frontend_dist/
+logs/
+*.log
+config.yaml

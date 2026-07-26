@@ -1,0 +1,431 @@
+<script>
+    import InputData from "./InputData.svelte";
+    import EmailTemplate from "./EmailTemplate.svelte";
+    import ProviderConfig from "./ProviderConfig.svelte";
+    import WorkerConfig from "./WorkerConfig.svelte";
+    import PreviewModal from "./PreviewModal.svelte";
+
+    // --- Input Data ---
+    let csvText = $state("");
+    let csvHeaders = $state([]);
+    let csvCount = $state(0);
+    let manualMode = $state(false);
+    let fileName = $state("");
+
+    // --- Template ---
+    let subject = $state("");
+    let body = $state("");
+    let toField = $state("{name} <{email}>");
+
+    // --- Provider ---
+    let provider = $state("smtp");
+    let fromEmail = $state("");
+    let smtpHost = $state("");
+    let smtpPort = $state("");
+    let smtpUsername = $state("");
+    let smtpPassword = $state("");
+    let smtpTLS = $state(false);
+    let sesRegion = $state("");
+    let sesAccessKeyId = $state("");
+    let sesSecretAccessKey = $state("");
+
+    // --- Worker ---
+    let concurrency = $state(10);
+    let maxRetries = $state(3);
+    let backoffBase = $state("1s");
+    let backoffMax = $state("30s");
+
+    // --- UI state ---
+    let activeTab = $state("provider");
+    let previews = $state([]);
+    let previewOpen = $state(false);
+    let progress = $state({
+        total: 0,
+        sent: 0,
+        failed: 0,
+        pending: 0,
+        state: "idle",
+    });
+    let campaignRunning = $derived(
+        progress.state === "running" || progress.state === "ready",
+    );
+    let loading = $state(true);
+    let error = $state("");
+    let saving = $state(false);
+
+    let progressPercent = $derived(
+        progress.total > 0
+            ? Math.round(
+                  ((progress.sent + progress.failed) / progress.total) * 100,
+              )
+            : 0,
+    );
+
+    // --- api ---
+    async function apiGet(path) {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+    }
+    async function apiPost(path, body) {
+        const res = await fetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+    }
+
+    async function loadDefaults() {
+        loading = true;
+        error = "";
+        try {
+            const data = await apiGet("/api/campaign/config");
+            fromEmail = data.email.from || "";
+            provider = data.email.provider || "smtp";
+            smtpHost = data.email.smtp?.Host || "";
+            smtpPort = data.email.smtp?.Port?.toString() || "";
+            smtpUsername = data.email.smtp?.Username || "";
+            smtpPassword = data.email.smtp?.Password || "";
+            smtpTLS = data.email.smtp?.TLS || false;
+            sesRegion = data.email.ses?.Region || "";
+            sesAccessKeyId = data.email.ses?.AccessKeyID || "";
+            sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
+            concurrency = data.worker?.Concurrency || 10;
+            maxRetries = data.worker?.MaxRetries || 3;
+            backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
+            backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
+        } catch (e) {
+            error = "Failed to load config: " + e.message;
+        } finally {
+            loading = false;
+        }
+    }
+
+    $effect(() => {
+        loadDefaults();
+    });
+
+    function buildPayload() {
+        return {
+            csv: csvText,
+            subject,
+            body,
+            to: toField,
+            from: fromEmail,
+            provider,
+            smtp: {
+                Host: smtpHost,
+                Port: parseInt(smtpPort) || 0,
+                Username: smtpUsername,
+                Password: smtpPassword,
+                TLS: smtpTLS,
+            },
+            ses: {
+                Region: sesRegion,
+                AccessKeyID: sesAccessKeyId,
+                SecretAccessKey: sesSecretAccessKey,
+            },
+            concurrency,
+            max_retries: maxRetries,
+            retry_backoff_base: backoffBase,
+            retry_backoff_max: backoffMax,
+        };
+    }
+
+    async function handlePreview() {
+        saving = true;
+        error = "";
+        try {
+            const payload = buildPayload();
+            payload.count = 5;
+            const data = await apiPost("/api/campaign/preview", payload);
+            previews = data.previews || [];
+            previewOpen = true;
+        } catch (e) {
+            error = "Preview failed: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    let progressInterval;
+    async function handleStart() {
+        if (!csvText.trim()) {
+            error = "Please provide CSV data first.";
+            return;
+        }
+        saving = true;
+        error = "";
+        try {
+            await apiPost("/api/campaign/start", buildPayload());
+            progress.state = "running";
+            progressInterval = setInterval(async () => {
+                try {
+                    progress = await apiGet("/api/campaign/progress");
+                    if (
+                        progress.state === "completed" ||
+                        progress.state === "idle"
+                    ) {
+                        clearInterval(progressInterval);
+                    }
+                } catch (e) {
+                    /* ignore */
+                }
+            }, 1000);
+        } catch (e) {
+            error = "Start failed: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handleReset() {
+        saving = true;
+        error = "";
+        try {
+            await apiPost("/api/campaign/reset", {});
+            progress = {
+                total: 0,
+                sent: 0,
+                failed: 0,
+                pending: 0,
+                state: "idle",
+            };
+            clearInterval(progressInterval);
+        } catch (e) {
+            error = "Reset failed: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handleResetProvider() {
+        saving = true;
+        try {
+            const data = await apiGet("/api/campaign/config");
+            fromEmail = data.email.from || "";
+            provider = data.email.provider || "smtp";
+            smtpHost = data.email.smtp?.Host || "";
+            smtpPort = data.email.smtp?.Port?.toString() || "";
+            smtpUsername = data.email.smtp?.Username || "";
+            smtpPassword = data.email.smtp?.Password || "";
+            smtpTLS = data.email.smtp?.TLS || false;
+            sesRegion = data.email.ses?.Region || "";
+            sesAccessKeyId = data.email.ses?.AccessKeyID || "";
+            sesSecretAccessKey = data.email.ses?.SecretAccessKey || "";
+        } catch (e) {
+            error = "Failed to reset defaults: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handleResetWorker() {
+        saving = true;
+        try {
+            const data = await apiGet("/api/campaign/config");
+            concurrency = data.worker?.Concurrency || 10;
+            maxRetries = data.worker?.MaxRetries || 3;
+            backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
+            backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
+        } catch (e) {
+            error = "Failed to reset defaults: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
+</script>
+
+<div class="space-y-6">
+    {#if error}
+        <div role="alert" class="alert alert-error">
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-6 w-6 shrink-0 stroke-current"
+                fill="none"
+                viewBox="0 0 24 24"
+                ><path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                /></svg
+            >
+            <span>{error}</span>
+            <button class="btn btn-ghost btn-sm" onclick={() => (error = "")}
+                >Dismiss</button
+            >
+        </div>
+    {/if}
+
+    {#if loading}
+        <div class="flex items-center justify-center py-20">
+            <span class="loading loading-spinner loading-lg"></span>
+            <span class="ml-3 text-base-content/70"
+                >Loading configuration...</span
+            >
+        </div>
+    {:else}
+        <InputData
+            bind:csvText
+            bind:csvHeaders
+            bind:csvCount
+            bind:manualMode
+            bind:fileName
+        />
+
+        <EmailTemplate
+            bind:toField
+            bind:subject
+            bind:body
+            disabled={campaignRunning}
+        />
+
+        <!-- Config Tabs -->
+        <div class="card">
+            <div role="tablist" class="tabs tabs-lift">
+                <button
+                    role="tab"
+                    class="tab {activeTab === 'provider' ? 'tab-active' : ''}"
+                    onclick={() => (activeTab = "provider")}
+                    >Email Provider</button
+                >
+                <button
+                    role="tab"
+                    class="tab {activeTab === 'worker' ? 'tab-active' : ''}"
+                    onclick={() => (activeTab = "worker")}>Worker Config</button
+                >
+            </div>
+
+            <div class="card-body bg-base-100 shadow-sm">
+                {#if activeTab === "provider"}
+                    <ProviderConfig
+                        bind:provider
+                        bind:fromEmail
+                        bind:smtpHost
+                        bind:smtpPort
+                        bind:smtpUsername
+                        bind:smtpPassword
+                        bind:smtpTLS
+                        bind:sesRegion
+                        bind:sesAccessKeyId
+                        bind:sesSecretAccessKey
+                        disabled={campaignRunning}
+                        onreset={handleResetProvider}
+                    />
+                {:else}
+                    <WorkerConfig
+                        bind:concurrency
+                        bind:maxRetries
+                        bind:backoffBase
+                        bind:backoffMax
+                        disabled={campaignRunning}
+                        onreset={handleResetWorker}
+                    />
+                {/if}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title text-lg">Actions</h2>
+                <div class="flex flex-wrap gap-3">
+                    <button
+                        class="btn btn-outline"
+                        onclick={handlePreview}
+                        disabled={saving || !csvText.trim() || campaignRunning}
+                    >
+                        {#if saving}<span
+                                class="loading loading-spinner loading-xs"
+                            ></span>{/if}
+                        Dry-Run Preview
+                    </button>
+                    <button
+                        class="btn btn-primary"
+                        onclick={handleStart}
+                        disabled={saving || !csvText.trim() || campaignRunning}
+                    >
+                        {#if campaignRunning}<span
+                                class="loading loading-spinner loading-xs"
+                            ></span>{/if}
+                        Start Campaign
+                    </button>
+                    <button
+                        class="btn btn-ghost"
+                        onclick={handleReset}
+                        disabled={saving}
+                    >
+                        Reset
+                    </button>
+                </div>
+                {#if !csvText.trim()}
+                    <p class="text-sm text-base-content/50">
+                        Provide CSV data to enable Preview and Start.
+                    </p>
+                {/if}
+            </div>
+        </div>
+
+        <!-- Progress -->
+        {#if progress.state !== "idle"}
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-lg">
+                        Progress
+                        {#if progress.state === "running"}
+                            <span class="badge badge-info">Running</span>
+                        {:else if progress.state === "completed"}
+                            <span class="badge badge-success">Completed</span>
+                        {:else}
+                            <span class="badge">{progress.state}</span>
+                        {/if}
+                    </h2>
+                    <progress
+                        class="progress progress-primary w-full"
+                        value={progressPercent}
+                        max="100"
+                    ></progress>
+                    <p class="text-sm text-base-content/60">
+                        {progressPercent}% complete
+                    </p>
+                    <div class="stats stats-horizontal shadow w-full">
+                        <div class="stat">
+                            <div class="stat-title">Total</div>
+                            <div class="stat-value text-lg">
+                                {progress.total}
+                            </div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Sent</div>
+                            <div class="stat-value text-lg text-success">
+                                {progress.sent}
+                            </div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Failed</div>
+                            <div class="stat-value text-lg text-error">
+                                {progress.failed}
+                            </div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Pending</div>
+                            <div class="stat-value text-lg text-warning">
+                                {progress.pending}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {/if}
+    {/if}
+</div>
+
+<PreviewModal
+    open={previewOpen}
+    {previews}
+    onclose={() => (previewOpen = false)}
+/>

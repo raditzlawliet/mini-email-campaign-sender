@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+email:
+  provider: smtp
+  from: "sender@example.com"
+  smtp:
+    host: "localhost"
+    port: 1025
+    username: ""
+    password: ""
+    tls: false
+  ses:
+    region: "us-east-1"
+    access_key_id: ""
+    secret_access_key: ""
+
+worker:
+  concurrency: 10
+  max_retries: 3
+  retry_backoff_base: "1s"
+  retry_backoff_max: "30s"
