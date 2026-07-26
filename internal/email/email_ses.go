@@ -163,6 +163,15 @@ func (s *sesSender) flushTemplate() error {
 	return nil
 }
 
+// PendingCount returns the number of messages buffered in the template batch.
+// For raw mode (non-template), returns 0 since each Send call sends immediately.
+func (s *sesSender) PendingCount() int {
+	if s.useTemplate {
+		return len(s.batch)
+	}
+	return 0
+}
+
 // Flush sends any remaining buffered template emails. No-op for raw mode.
 func (s *sesSender) Flush() error {
 	if s.useTemplate {

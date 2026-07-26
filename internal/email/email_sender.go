@@ -13,6 +13,10 @@ type EmailSender interface {
 	Send(to string, subject string, body string, data map[string]string) error
 	// Flush sends any batched/buffered messages. No-op for non-batched senders.
 	Flush() error
+	// PendingCount returns the number of messages buffered in the sender's
+	// internal batch that have not yet been sent. Returns 0 for senders that
+	// send immediately (no batching).
+	PendingCount() int
 }
 
 // SenderConfig holds the configuration needed to create an email sender.

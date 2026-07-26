@@ -86,6 +86,11 @@ func (s *smtpSender) Send(to string, subject string, body string, data map[strin
 	return nil
 }
 
+// PendingCount returns the number of messages buffered in the batch.
+func (s *smtpSender) PendingCount() int {
+	return len(s.batch)
+}
+
 // Flush sends all accumulated messages in a single DialAndSend call.
 func (s *smtpSender) Flush() error {
 	if len(s.batch) == 0 {

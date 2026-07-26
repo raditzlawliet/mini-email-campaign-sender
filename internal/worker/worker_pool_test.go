@@ -47,7 +47,8 @@ func (m *mockSender) Send(to string, subject string, body string, data map[strin
 	return nil
 }
 
-func (m *mockSender) Flush() error { return nil }
+func (m *mockSender) Flush() error      { return nil }
+func (m *mockSender) PendingCount() int { return 0 }
 
 type mockLogger struct{}
 
