@@ -6,29 +6,45 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
   <img src="./docs/preview.png" alt="Preview">
 </p>
 
+## Features
+
+- **CSV input** via file upload (100MB+) or manual paste, with header-based `{placeholder}` personalization
+- **Pre-configured defaults** from `config.yaml` — all settings overridable per campaign in the web UI
+- **Dry-run preview** — render sample emails in sandboxed iframes (Render/Code tabs) without sending
+- **Batch SMTP sending** — configurable batch size per connection to maximize throughput
+- **Worker pool** — concurrent goroutines with per-worker dedicated sender instances
+- **Retry logic** — exponential backoff with configurable max attempts and base/max durations
+- **Pause / Resume** — graceful pause (in-flight email completes), resume processes only pending recipients
+- **Real-time progress** — SSE stream pushes progress bar + log events to frontend every 1s
+- **Session restore** — page refresh restores in-progress campaign state
+- **Campaign logging** — optional per-run JSON log file with full configuration and delivery tracking
+- **Verbose mode** — per-email debug details in frontend and log file
+- **Single binary** — Svelte 5 frontend embedded in Go binary via `//go:embed`
+
 ## Quick Start
 
 ```bash
-# 1. Edit default configuration (config.yaml has sensible defaults)
-# 2. Build the application
-make build
+# Run on Linux
+chmod +x bin/mecs
+./mecs
 
-# 3. Run
-./bin/server
+# Run on Windows
+./mecs.exe
 ```
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## Configuration
 
-Edit `config.yaml` to set defaults for server, email provider, and worker pool:
+By default if no config provided, it will automatically created `config.yaml`.
+You can edit `config.yaml` to set defaults for server, email provider, worker pool, and logging:
 
 ```yaml
 server:
   port: 8080
 
 email:
-  provider: smtp           # "smtp" or "ses"
+  provider: smtp # "smtp" or "ses"
   from: "sender@example.com"
   smtp:
     host: "localhost"
@@ -36,7 +52,7 @@ email:
     username: ""
     password: ""
     tls: false
-    batch_size: 50
+    batch_size: 50 # emails per SMTP connection (1–500)
   ses:
     region: "us-east-1"
     access_key_id: ""
@@ -50,11 +66,30 @@ worker:
 
 log:
   campaign:
-    log_to_file: true
-    verbose: false
+    log_to_file: true # write campaign events to logs/campaign_*.log
+    verbose: false # include per-email debug detail
 ```
 
-All settings can be overridden per campaign in the web interface.
+| Section        | Key                  | Default     | Description                     |
+| -------------- | -------------------- | ----------- | ------------------------------- |
+| `server`       | `port`               | `8080`      | HTTP server port                |
+| `email`        | `provider`           | `smtp`      | Email provider: `smtp` or `ses` |
+| `email`        | `from`               | —           | Sender email address            |
+| `email.smtp`   | `host`               | `localhost` | SMTP server hostname            |
+| `email.smtp`   | `port`               | `1025`      | SMTP server port                |
+| `email.smtp`   | `username`           | —           | SMTP auth username (optional)   |
+| `email.smtp`   | `password`           | —           | SMTP auth password (optional)   |
+| `email.smtp`   | `tls`                | `false`     | Enable TLS                      |
+| `email.smtp`   | `batch_size`         | `50`        | Emails per SMTP connection      |
+| `email.ses`    | `region`             | —           | AWS region (e.g. `us-east-1`)   |
+| `email.ses`    | `access_key_id`      | —           | AWS access key ID               |
+| `email.ses`    | `secret_access_key`  | —           | AWS secret access key           |
+| `worker`       | `concurrency`        | `10`        | Parallel worker goroutines      |
+| `worker`       | `max_retries`        | `3`         | Max retry attempts per email    |
+| `worker`       | `retry_backoff_base` | `1s`        | Initial retry delay             |
+| `worker`       | `retry_backoff_max`  | `30s`       | Max retry delay cap             |
+| `log.campaign` | `log_to_file`        | `true`      | Write per-run JSON log file     |
+| `log.campaign` | `verbose`            | `false`     | Enable debug-level detail       |
 
 ## Development
 
@@ -62,12 +97,12 @@ All settings can be overridden per campaign in the web interface.
 
 - Go 1.22+
 - Node.js 20+
-- [Mailtrap Local](https://github.com/mailtrap/mailtrap-local) (for email testing)
+- [Mailpit](https://github.com/axllent/mailpit) (for email testing)
 
-### Frontend + Backend dev mode
+### Run in development mode
 
 ```bash
-# Terminal 1: Backend (API only + CORS)
+# Terminal 1: Backend (API only + CORS for :5173)
 make dev-be
 
 # Terminal 2: Frontend (Vite HMR, proxies /api to :8080)
@@ -76,10 +111,10 @@ make dev-fe
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### Email testing with Mailtrap Local
+### Email testing with Mailpit
 
 ```bash
-docker run -p 1025:1025 -p 8025:8025 mailtrap/mailtrap-local
+docker run -d -p 1025:1025 -p 8025:8025 --name mailpit axllent/mailpit
 ```
 
 Web interface at [http://localhost:8025](http://localhost:8025) to view captured emails.
@@ -88,7 +123,7 @@ Web interface at [http://localhost:8025](http://localhost:8025) to view captured
 
 ```bash
 make test                 # Unit tests
-make test-integration     # Integration tests (requires Mailtrap Local)
+make test-integration     # Integration tests (requires Mailpit)
 ```
 
 ## Build
@@ -97,19 +132,19 @@ make test-integration     # Integration tests (requires Mailtrap Local)
 make build
 ```
 
-Produces a single binary at `bin/server` with the frontend embedded.
+Produces a single binary at `bin/mecs` (`bin/mecs.exe` on Windows) with the frontend embedded.
 
 ## Makefile Targets
 
-| Target | Purpose |
-|--------|---------|
-| `make build` | Build frontend + embed + Go binary |
-| `make dev` | Production mode single binary |
-| `make dev-be` | Backend only (API + CORS for `:5173`) |
-| `make dev-fe` | Vite dev server with HMR |
-| `make test` | `go test ./...` |
-| `make test-integration` | Integration tests |
-| `make clean` | Remove build artifacts |
+| Target                  | Purpose                               |
+| ----------------------- | ------------------------------------- |
+| `make build`            | Build frontend + embed + Go binary    |
+| `make dev`              | Production mode single binary         |
+| `make dev-be`           | Backend only (API + CORS for `:5173`) |
+| `make dev-fe`           | Vite dev server with HMR              |
+| `make test`             | `go test ./...`                       |
+| `make test-integration` | Integration tests                     |
+| `make clean`            | Remove build artifacts                |
 
 ## Architecture
 
@@ -117,39 +152,41 @@ Produces a single binary at `bin/server` with the frontend embedded.
 cmd/server/              # Entry point, embeds frontend, SSE
 internal/
   config/                # YAML configuration
-  handler/               # HTTP handlers (Go Fiber v3)
-  worker/                # Worker pool + retry + RunPending for resume
-  email/                 # SMTP & SES senders, template rendering
-  store/                 # In-memory campaign state + event log
+  handler/               # HTTP handlers (Go Fiber v3) + multipart parsing
+  worker/                # Worker pool, retry, RunPending for resume
+  email/                 # SMTP (batched) & SES senders, template rendering
+  store/                 # In-memory campaign state, event log, verbose flag
   campaign/              # CSV parsing, campaign orchestration, file logging
 frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5
 ```
 
 ## API Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/campaign/config` | Return default configuration |
-| POST | `/api/campaign/preview` | Parse CSV + render sample emails |
-| POST | `/api/campaign/start` | Parse CSV + start worker pool |
-| POST | `/api/campaign/pause` | Gracefully pause campaign |
-| POST | `/api/campaign/resume` | Resume processing pending recipients |
-| GET | `/api/campaign/events` | SSE stream: progress + log every 1s |
-| POST | `/api/campaign/reset` | Clear all campaign state |
+| Method | Path                    | Purpose                                                  |
+| ------ | ----------------------- | -------------------------------------------------------- |
+| GET    | `/api/campaign/config`  | Return default config + campaign state (session restore) |
+| POST   | `/api/campaign/preview` | Parse CSV (multipart) + render N sample emails           |
+| POST   | `/api/campaign/start`   | Parse CSV (multipart) + start worker pool                |
+| POST   | `/api/campaign/pause`   | Gracefully pause campaign                                |
+| POST   | `/api/campaign/resume`  | Resume pending recipients                                |
+| GET    | `/api/campaign/events`  | SSE stream: progress + log every 1s                      |
+| POST   | `/api/campaign/reset`   | Clear all campaign state                                 |
 
 ## Campaign Flow
 
-1. **Input Data** — Upload a .csv file or paste CSV manually. First row is headers, requires an `email` column.
-2. **Email Template** — Configure To, Subject, and Body with `{placeholder}` variables. Click 🔍 to preview the body.
-3. **Email Provider** — Select SMTP or SES (defaults pre-filled from `config.yaml`). Override as needed.
+1. **Input Data** — Upload a `.csv` file or paste CSV manually. First row is headers, requires an `email` column. Available headers shown as copyable badges.
+2. **Email Template** — Configure To, Subject, and Body with `{placeholder}` variables matching CSV headers.
+3. **Email Provider** — Select SMTP or SES (defaults from `config.yaml`). Override host, port, credentials, TLS, and batch size per campaign.
 4. **Worker Config** — Adjust concurrency, max retries, and backoff settings.
-5. **Dry-Run Preview** — Render sample emails in sandboxed iframes (Render/Code tabs) without sending.
-6. **Start Campaign** — Begin sending. Real-time progress bar and log stream via SSE.
-7. **Pause / Resume** — Pause gracefully (in-flight email completes). Resume processes only pending recipients.
-8. **Reset** — Clear all state and start fresh.
+5. **Log Config** — Toggle per-run file logging and verbose debug output.
+6. **Dry-Run Preview** — Render sample emails in sandboxed iframes (Render/Code tabs) without sending.
+7. **Start Campaign** — Begin sending. Real-time progress bar and log stream via SSE.
+8. **Pause / Resume** — Pause gracefully (in-flight email completes). Resume processes only pending recipients.
+9. **Reset** — Clear all state and start fresh.
 
 ## Campaign Logs
 
-- **Console**: Human-readable log messages via `slog` during campaign run.
-- **Frontend**: Collapsable log panel with auto-scroll, live-updated via SSE.
-- **File**: Structured JSON log at `logs/campaign_<timestamp>.log` with full configuration, recipient statuses, and retry attempts.
+Each campaign run can write a structured JSON log file at `logs/campaign_<timestamp>.log`:
+
+- Set `log.campaign.log_to_file: false` to disable file logging
+- Set `log.campaign.verbose: true` to include debug-level per-email events

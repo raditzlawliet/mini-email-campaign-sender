@@ -31,7 +31,7 @@ System to send a single promotional email campaign to **1,000,000 recipients**, 
 
 ## Development
 
-- Use Mailtrap Local for email testing (https://github.com/mailtrap/mailtrap-local)
+- Use Mailpit Local for email testing (https://github.com/axllent/mailpit)
 - Include Unit Tests for backend logic and integration tests
 - Include build scripts for building the application and running tests using Makefile
 - Include Readme with development instruction and build instructions
