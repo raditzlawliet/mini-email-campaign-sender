@@ -1,11 +1,19 @@
 .PHONY: build test test-integration dev dev-fe dev-be clean
 
-BINARY := bin/server
+VERSION ?= dev
 FRONTEND_DIR := frontend
 EMBED_DIR := cmd/server/frontend_dist
 
+ifeq ($(OS),Windows_NT)
+	BINARY := bin/mecs.exe
+else
+	BINARY := bin/mecs
+endif
+
+LDFLAGS := -s -w -X main.version=$(VERSION)
+
 build: build-frontend copy-frontend
-	go build -o $(BINARY) ./cmd/server
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/server
 
 build-frontend:
 	cd $(FRONTEND_DIR) && npm install && npm run build

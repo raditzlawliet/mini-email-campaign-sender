@@ -19,6 +19,8 @@ import (
 	"github.com/raditzlawliet/test-mass-email/internal/store"
 )
 
+var version = "dev"
+
 //go:embed frontend_dist/*
 var frontendDist embed.FS
 
@@ -38,7 +40,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("config loaded", "port", cfg.Server.Port, "provider", cfg.Email.Provider)
+	slog.Info("starting MECS", "version", version, "port", cfg.Server.Port, "provider", cfg.Email.Provider)
 
 	store.InitStore()
 	st := store.GetStore()
@@ -46,7 +48,7 @@ func main() {
 	h := handler.NewHandler(cfg, st)
 
 	app := fiber.New(fiber.Config{
-		AppName:     "Email Campaign Sender",
+		AppName:     "Mini Email Campaign Sender",
 		ReadTimeout: 10 * 60 * time.Second,
 		BodyLimit:   1024 * 1024 * 1024, // 1GB
 	})

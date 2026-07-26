@@ -1,6 +1,8 @@
 package config
 
 import (
+	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -84,11 +86,22 @@ type rawConfig struct {
 	Log    LogConfig       `yaml:"log"`
 }
 
+//go:embed config.example.yaml
+var defaultConfigYAML []byte
+
 // Load reads and parses a YAML configuration file at the given path.
+// If the file does not exist, it writes the default configuration and loads it.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+		if errors.Is(err, os.ErrNotExist) {
+			if writeErr := os.WriteFile(path, defaultConfigYAML, 0o644); writeErr != nil {
+				return nil, fmt.Errorf("failed to create default config file %s: %w", path, writeErr)
+			}
+			data = defaultConfigYAML
+		} else {
+			return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+		}
 	}
 
 	var raw rawConfig

@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (e.g. 0.1.0, without v prefix)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version
+        env:
+          RAW: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          V="${RAW#v}"
+          if ! echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "::error::Invalid version '$V'. Expected semver (e.g. 0.1.0 or 0.1.0-beta.1)"
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+        id: version
+
+      - name: Create tag (manual trigger only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+  build-windows:
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+
+      - name: Copy frontend dist
+        shell: bash
+        run: |
+          rm -rf cmd/server/frontend_dist
+          mkdir -p cmd/server/frontend_dist
+          cp -r frontend/dist/* cmd/server/frontend_dist/
+
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+        run: go build -ldflags "-s -w -X main.version=${{ needs.prepare.outputs.version }}" -o bin/mecs.exe ./cmd/server
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: mecs-windows-x64
+          path: bin/mecs.exe
+
+  build-linux:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+
+      - name: Copy frontend dist
+        run: |
+          rm -rf cmd/server/frontend_dist
+          mkdir -p cmd/server/frontend_dist
+          cp -r frontend/dist/* cmd/server/frontend_dist/
+
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+        run: go build -ldflags "-s -w -X main.version=${{ needs.prepare.outputs.version }}" -o bin/mecs ./cmd/server
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: mecs-linux-x64
+          path: bin/mecs
+
+  create-release:
+    permissions:
+      contents: write
+    needs:
+      - prepare
+      - build-windows
+      - build-linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: v${{ needs.prepare.outputs.version }}
+          body: |
+            _Add release notes before publishing_
+          draft: true
+          prerelease: false
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
