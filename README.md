@@ -37,7 +37,7 @@ You can try latest pre-built binaries from the [releases page](https://github.co
 
 ```bash
 # Run on Linux
-chmod +x bin/mecs
+chmod +x ./mecs
 ./mecs
 
 # Run on Windows
