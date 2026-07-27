@@ -24,6 +24,7 @@ System to send a single promotional email campaign to **1,000,000 recipients**, 
 - UI default features
   - Support theme picker from daisy UI default theme collection, default is `dark`
   - Support multilingual and rtl display: en (default), id, ar
+  - Has App Version and Github link
 
 ## Tech Stack
 

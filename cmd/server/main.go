@@ -67,6 +67,9 @@ func main() {
 	}
 
 	// API routes
+	app.Get("/api/version", func(c fiber.Ctx) error {
+		return c.JSON(map[string]string{"version": version})
+	})
 	app.Get("/api/campaign/config", h.HandleGetConfig)
 	app.Post("/api/campaign/preview", h.HandlePreview)
 	app.Post("/api/campaign/start", h.HandleStart)

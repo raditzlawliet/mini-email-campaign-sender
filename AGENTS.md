@@ -1,6 +1,7 @@
 # AGENTS.md — Mini Email Campaign Sender
 
 > AI agent configuration. Update as the project evolves. Keep it short.
+> You, AI, should update this AGENTS.md as much as needed as the project evolve.
 
 ## Project
 
@@ -23,6 +24,7 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 
 | Method | Path | Purpose |
 |--------|------|---------|
+| GET | `/api/version` | Return app version (set via `-ldflags -X main.version`) |
 | GET | `/api/campaign/config` | Return default configuration + current campaign state (session restore) |
 | POST | `/api/campaign/preview` | Parse CSV (multipart/form-data) + render N sample emails |
 | POST | `/api/campaign/start` | Parse CSV (multipart/form-data) + start worker pool |
@@ -67,7 +69,7 @@ Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or te
 cmd/server/              # main entrypoint, embedded frontend
 internal/
   config/                # YAML config loading, partial save (yaml.Node merge, canonical order)
-  handler/               # 8 HTTP handlers (Go Fiber v3)
+  handler/               # 9 HTTP handlers (Go Fiber v3)
   worker/                # worker pool, queue, retry logic, RunPending for resume
   email/                 # SMTP + SES senders, template rendering, batched SMTP
   store/                 # in-memory recipient status store
@@ -83,7 +85,7 @@ frontend/
         WorkerConfig.svelte   # concurrency, retries, backoff, Reset/Save-as-defaults buttons
         LogConfig.svelte      # log_to_file and verbose toggles, Reset/Save-as-defaults buttons
         PreviewModal.svelte   # iframe sandbox render, code tab, next/prev
-        Navbar.svelte         # title + language picker (globe icon) + theme picker (DaisyUI dropdowns, auto-persist)
+        Navbar.svelte         # version badge + title + GitHub icon + language picker (globe) + theme picker (DaisyUI dropdowns, auto-persist)
         ConfirmModal.svelte   # reusable confirmation dialog (i18n-reactive defaults)
       i18n.svelte.js         # translations (en/ar/id), reactive $state store, RTL sync
     App.svelte             # layout shell: Navbar + CampaignForm
