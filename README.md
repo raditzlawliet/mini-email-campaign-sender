@@ -11,7 +11,7 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
 - **CSV input** via file upload (100MB+) or manual paste, with header-based `{placeholder}` personalization
 - **Pre-configured defaults** from `config.yaml` — all settings overridable per campaign in the web UI
 - **Dry-run preview** — render sample emails in sandboxed iframes (Render/Code tabs) without sending
-- **Batch SMTP sending** — configurable batch size per connection to maximize throughput
+- **Email providers** — SMTP, SES, and SES Templates (see [Supported Providers](#supported-providers) below)
 - **Worker pool** — concurrent goroutines with per-worker dedicated sender instances
 - **Retry logic** — exponential backoff with configurable max attempts and base/max durations
 - **Pause / Resume** — graceful pause (in-flight email completes), resume processes only pending recipients
@@ -20,6 +20,18 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
 - **Campaign logging** — optional per-run JSON log file with full configuration and delivery tracking
 - **Verbose mode** — per-email debug details in frontend and log file
 - **Single binary** — Svelte 5 frontend embedded in Go binary via `//go:embed`
+
+## Supported Providers
+
+| Provider          | Method                   | Batch                   | Description                                                                                    |
+| ----------------- | ------------------------ | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| **SMTP**          | `DialAndSend`            | ✅ configurable (1–500) | Direct SMTP connection, batched per connection for throughput                                  |
+| **SES**           | `SendRawEmail`           | ❌ per-email            | Raw email sending via Amazon SES API                                                           |
+| **SES Templates** | `SendBulkTemplatedEmail` | ✅ configurable (1–50)  | Marketing emails via SES templates; subject/body from template, CSV data as template variables |
+
+## Download
+
+You can try latest pre-built binaries from the [releases page](https://github.com/raditzlawliet/mini-email-campaign-sender/releases).
 
 ## Quick Start
 
@@ -52,11 +64,14 @@ email:
     username: ""
     password: ""
     tls: false
-    batch_size: 50 # emails per SMTP connection (1–500)
+    batch_size: 50
   ses:
     region: "us-east-1"
     access_key_id: ""
     secret_access_key: ""
+    use_template: false
+    template_name: ""
+    batch_size: 50
 
 worker:
   concurrency: 10
@@ -84,6 +99,9 @@ log:
 | `email.ses`    | `region`             | —           | AWS region (e.g. `us-east-1`)   |
 | `email.ses`    | `access_key_id`      | —           | AWS access key ID               |
 | `email.ses`    | `secret_access_key`  | —           | AWS secret access key           |
+| `email.ses`    | `use_template`       | `false`     | Use SES template (marketing)    |
+| `email.ses`    | `template_name`      | —           | SES template name               |
+| `email.ses`    | `batch_size`         | `50`        | Emails per Bulk API call (1–50) |
 | `worker`       | `concurrency`        | `10`        | Parallel worker goroutines      |
 | `worker`       | `max_retries`        | `3`         | Max retry attempts per email    |
 | `worker`       | `retry_backoff_base` | `1s`        | Initial retry delay             |
@@ -176,7 +194,7 @@ frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5
 
 1. **Input Data** — Upload a `.csv` file or paste CSV manually. First row is headers, requires an `email` column. Available headers shown as copyable badges.
 2. **Email Template** — Configure To, Subject, and Body with `{placeholder}` variables matching CSV headers.
-3. **Email Provider** — Select SMTP or SES (defaults from `config.yaml`). Override host, port, credentials, TLS, and batch size per campaign.
+3. **Email Provider** — Select SMTP or SES (defaults from `config.yaml`). Override host, port, credentials, TLS, and batch size per campaign. SES supports template mode for marketing emails — when enabled, subject/body are defined by the SES template and CSV data becomes template variables, sent via batched `SendBulkTemplatedEmail`.
 4. **Worker Config** — Adjust concurrency, max retries, and backoff settings.
 5. **Log Config** — Toggle per-run file logging and verbose debug output.
 6. **Dry-Run Preview** — Render sample emails in sandboxed iframes (Render/Code tabs) without sending.
@@ -190,3 +208,17 @@ Each campaign run can write a structured JSON log file at `logs/campaign_<timest
 
 - Set `log.campaign.log_to_file: false` to disable file logging
 - Set `log.campaign.verbose: true` to include debug-level per-email events
+
+## Contributors
+
+Contributions are welcome! Check the [Issues](https://github.com/raditzlawliet/mini-email-campaign-sender/issues) page or open a Pull Request.
+
+<div align="center">
+    <a href="https://github.com/raditzlawliet/mini-email-campaign-sender/graphs/contributors">
+        <img src="https://contrib.rocks/image?repo=raditzlawliet/mini-email-campaign-sender" />
+    </a>
+</div>
+
+## License
+
+MIT

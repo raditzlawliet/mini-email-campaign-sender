@@ -30,7 +30,7 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 | GET | `/api/campaign/events` | SSE stream: pushes progress + log events every 1s |
 | POST | `/api/campaign/reset` | Clear all campaign state (works on paused too) |
 
-Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `smtp_batch_size`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`, `log_to_file`, `verbose`. Preview also accepts `count`.
+Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `smtp_batch_size`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `ses_use_template`, `ses_template_name`, `ses_batch_size`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`, `log_to_file`, `verbose`. Preview also accepts `count`.
 
 ## Naming Conventions
 
@@ -88,7 +88,7 @@ frontend/
 
 - `slog` for all logging: `LevelError`/`LevelInfo`/`LevelDebug`.
 - Placeholders `{key}` rendered via `strings.NewReplacer`.
-- Worker pool: context cancellation, exponential backoff retry. Each worker goroutine creates its own `EmailSender` via `SenderFactory`. SMTP senders batch messages using a single `DialAndSend` call per batch (configurable `batch_size`, default 50). Flush on worker completion.
+- Worker pool: context cancellation, exponential backoff retry. Each worker goroutine creates its own `EmailSender` via `SenderFactory`. SMTP senders batch messages using a single `DialAndSend` call per batch (configurable `batch_size`, default 50). SES template mode buffers entries and flushes via `SendBulkTemplatedEmail` (configurable `batch_size`, default 50, max 50). Flush on worker completion.
 - Pause: cancels context between sends (in-flight email completes gracefully). Resume: `RunPending` processes only `pending` recipients.
 - Unified logging: `Store.LogAndEvent(level, msg)` logs to both `slog` (console) and in-memory events (frontend). `CampaignLogger.Log(level, msg)` writes the same message to a JSON file per run.
 - Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`. Controlled by `log.campaign.log_to_file` in config.
