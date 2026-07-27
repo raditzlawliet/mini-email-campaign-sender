@@ -9,7 +9,7 @@ Single-page app to send personalized email campaigns to 1M recipients per campai
 - **Frontend**: Svelte 5 (runes), TailwindCSS v4, DaisyUI v5, Embed in Go binary.
 - **Backend**: Go, Go Fiber v3, `wneessen/go-mail` for email sending, `slog` for logging.
 - **Email Testing**: Mailtrap Local (`mailtrap-local`)
-- **Config**: File-based YAML for server port, email provider, retry params, log behavior
+- **Config**: File-based YAML for server port, email provider, retry params, log behavior, app theme
 - **Dev mode**: `DEV_MODE=true` enables CORS + API-only backend; Vite proxies `/api` to backend on `:8080`.
 
 ## Spec Flow
@@ -79,9 +79,9 @@ frontend/
         WorkerConfig.svelte   # concurrency, retries, backoff
         LogConfig.svelte      # log_to_file and verbose toggles
         PreviewModal.svelte   # iframe sandbox render, code tab, next/prev
-    App.svelte
+    App.svelte             # layout shell: navbar + theme picker (DaisyUI theme-controller), config init
     main.js
-    app.css               # TailwindCSS v4 + DaisyUI v5
+    app.css               # TailwindCSS v4 + DaisyUI v5 (themes: all)
 ```
 
 ## Go Conventions
@@ -108,7 +108,7 @@ frontend/
 - **SSE**: Single `EventSource` connected on mount via `GET /api/campaign/events`, never disconnected. Streams progress + log every 1s.
 - **Session restore**: On page refresh, `GET /api/campaign/config` returns current campaign state (template, config, progress, events). Form restores to in-progress state if campaign is running/paused/completed.
 - **Form lock**: Input data, template, provider, and worker config are disabled when campaign is running or paused. Reset button disabled only when `running` (enabled on paused/completed).
-- **Icons**: Use `@lucide/svelte` for icons (ChevronRight/Down, X, ChevronLeft/Right).
+- **Icons**: Use `@lucide/svelte` for icons (Check, ChevronRight/Down/Up, X, ChevronLeft/Right, PauseIcon, PlayIcon).
 - **Literal braces**: Use `{'{name}'}` syntax in template HTML to output literal `{name}`.
 
 ## Testing Rules

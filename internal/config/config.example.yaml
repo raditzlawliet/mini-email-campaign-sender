@@ -1,3 +1,6 @@
+app:
+  theme: dark # daisyui theme: dark, light, cupcake, synthwave, etc.
+
 server:
   port: 8080
 

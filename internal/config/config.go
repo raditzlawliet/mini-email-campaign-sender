@@ -12,10 +12,16 @@ import (
 
 // Config holds the full application configuration.
 type Config struct {
+	App    AppConfig    `yaml:"app"`
 	Server ServerConfig `yaml:"server"`
 	Email  EmailConfig  `yaml:"email"`
 	Worker WorkerConfig `yaml:"worker"`
 	Log    LogConfig    `yaml:"log"`
+}
+
+// AppConfig holds application-level settings.
+type AppConfig struct {
+	Theme string `yaml:"theme"`
 }
 
 // LogConfig holds logging configuration.
@@ -80,6 +86,7 @@ type rawWorkerConfig struct {
 
 // rawConfig mirrors Config but uses rawWorkerConfig for duration parsing.
 type rawConfig struct {
+	App    AppConfig       `yaml:"app"`
 	Server ServerConfig    `yaml:"server"`
 	Email  EmailConfig     `yaml:"email"`
 	Worker rawWorkerConfig `yaml:"worker"`
@@ -126,6 +133,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg := &Config{
+		App:    raw.App,
 		Server: raw.Server,
 		Email:  raw.Email,
 		Worker: WorkerConfig{
@@ -137,6 +145,9 @@ func Load(path string) (*Config, error) {
 		Log: raw.Log,
 	}
 
+	if cfg.App.Theme == "" {
+		cfg.App.Theme = "dark"
+	}
 	if cfg.Email.Provider == "" {
 		cfg.Email.Provider = "smtp"
 	}

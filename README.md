@@ -1,4 +1,4 @@
-# Mini Email Campaign Sender
+# MECS - Mini Email Campaign Sender
 
 Send personalized email campaigns via SMTP or Amazon SES, with real-time progress tracking, pause/resume, retry logic, and a clean web interface.
 
@@ -8,7 +8,7 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
 
 ## Features
 
-- **CSV input** via file upload (100MB+) or manual paste, with header-based `{placeholder}` personalization
+- **CSV input** via file upload or manual paste, with header-based `{placeholder}` personalization
 - **Pre-configured defaults** from `config.yaml` — all settings overridable per campaign in the web UI
 - **Dry-run preview** — render sample emails in sandboxed iframes (Render/Code tabs) without sending
 - **Email providers** — SMTP, SES, and SES Templates (see [Supported Providers](#supported-providers) below)

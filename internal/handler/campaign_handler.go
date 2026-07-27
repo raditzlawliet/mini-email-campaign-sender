@@ -31,6 +31,9 @@ func (h *Handler) HandleGetConfig(c fiber.Ctx) error {
 	cfg := st.GetConfig()
 
 	return c.JSON(map[string]any{
+		"app": map[string]any{
+			"theme": h.DefaultConfig.App.Theme,
+		},
 		"server": h.DefaultConfig.Server,
 		"email": map[string]any{
 			"provider": h.DefaultConfig.Email.Provider,

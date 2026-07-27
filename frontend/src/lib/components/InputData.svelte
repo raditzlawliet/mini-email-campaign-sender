@@ -83,8 +83,8 @@
         <div class="flex items-center justify-between">
             <h2 class="card-title text-lg">Input Data</h2>
             <label class="label cursor-pointer gap-2">
-                <span class="label-text text-sm">Manual input</span>
-                <input type="checkbox" class="toggle toggle-sm" checked={manualMode} onchange={toggleManual} {disabled} />
+                <span class="label-text">Manual input</span>
+                <input type="checkbox" class="toggle" checked={manualMode} onchange={toggleManual} {disabled} />
             </label>
         </div>
 
