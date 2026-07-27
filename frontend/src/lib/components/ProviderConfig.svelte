@@ -1,4 +1,6 @@
 <script>
+    import { t } from "../i18n.svelte.js";
+
     let {
         provider = $bindable("smtp"),
         fromEmail = $bindable(""),
@@ -22,20 +24,20 @@
 
 <div>
     <fieldset class="fieldset">
-        <label class="label" for="cfg-provider">Provider</label>
+        <label class="label" for="cfg-provider">{t("provider")}</label>
         <select
             id="cfg-provider"
             class="select w-full"
             bind:value={provider}
             {disabled}
         >
-            <option value="smtp">SMTP</option>
-            <option value="ses">Amazon SES</option>
+            <option value="smtp">{t("smtp")}</option>
+            <option value="ses">{t("amazon_ses")}</option>
         </select>
     </fieldset>
 
     <fieldset class="fieldset">
-        <label class="label" for="cfg-from">From</label>
+        <label class="label" for="cfg-from">{t("from")}</label>
         <input
             id="cfg-from"
             type="text"
@@ -49,7 +51,7 @@
     {#if provider === "smtp"}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
             <fieldset class="fieldset">
-                <label class="label" for="cfg-smtp-host">Host</label>
+                <label class="label" for="cfg-smtp-host">{t("host")}</label>
                 <input
                     id="cfg-smtp-host"
                     type="text"
@@ -60,7 +62,7 @@
                 />
             </fieldset>
             <fieldset class="fieldset">
-                <label class="label" for="cfg-smtp-port">Port</label>
+                <label class="label" for="cfg-smtp-port">{t("port")}</label>
                 <input
                     id="cfg-smtp-port"
                     type="text"
@@ -71,7 +73,7 @@
                 />
             </fieldset>
             <fieldset class="fieldset">
-                <label class="label" for="cfg-smtp-user">Username</label>
+                <label class="label" for="cfg-smtp-user">{t("username")}</label>
                 <input
                     id="cfg-smtp-user"
                     type="text"
@@ -82,7 +84,7 @@
                 />
             </fieldset>
             <fieldset class="fieldset">
-                <label class="label" for="cfg-smtp-pass">Password</label>
+                <label class="label" for="cfg-smtp-pass">{t("password")}</label>
                 <input
                     id="cfg-smtp-pass"
                     type="password"
@@ -93,7 +95,9 @@
                 />
             </fieldset>
             <fieldset class="fieldset">
-                <label class="label" for="cfg-smtp-batch">Batch Size</label>
+                <label class="label" for="cfg-smtp-batch"
+                    >{t("batch_size")}</label
+                >
                 <input
                     id="cfg-smtp-batch"
                     type="number"
@@ -103,7 +107,7 @@
                     bind:value={smtpBatchSize}
                     {disabled}
                 />
-                <p class="fieldset-label">Emails per SMTP connection (1–500)</p>
+                <p class="fieldset-label">{t("emails_per_smtp")}</p>
             </fieldset>
         </div>
         <fieldset class="fieldset">
@@ -114,13 +118,13 @@
                     bind:checked={smtpTLS}
                     {disabled}
                 />
-                Enable TLS
+                {t("enable_tls")}
             </label>
         </fieldset>
     {:else}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
             <fieldset class="fieldset">
-                <label class="label" for="cfg-ses-region">Region</label>
+                <label class="label" for="cfg-ses-region">{t("region")}</label>
                 <input
                     id="cfg-ses-region"
                     type="text"
@@ -131,7 +135,9 @@
                 />
             </fieldset>
             <fieldset class="fieldset">
-                <label class="label" for="cfg-ses-key">Access Key ID</label>
+                <label class="label" for="cfg-ses-key"
+                    >{t("access_key_id")}</label
+                >
                 <input
                     id="cfg-ses-key"
                     type="text"
@@ -143,7 +149,9 @@
             </fieldset>
         </div>
         <fieldset class="fieldset">
-            <label class="label" for="cfg-ses-secret">Secret Access Key</label>
+            <label class="label" for="cfg-ses-secret"
+                >{t("secret_access_key")}</label
+            >
             <input
                 id="cfg-ses-secret"
                 type="password"
@@ -164,13 +172,10 @@
                     bind:checked={sesUseTemplate}
                     {disabled}
                 />
-                <span class="label-text"
-                    >Use SES Template (marketing emails)</span
-                >
+                <span class="label-text">{t("use_ses_template")}</span>
             </label>
             <p class="fieldset-label text-base-content/50">
-                When enabled, Subject and Body are defined by the SES template.
-                CSV data columns become template variables.
+                {t("ses_template_desc")}
             </p>
         </fieldset>
 
@@ -178,7 +183,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 mt-2">
                 <fieldset class="fieldset">
                     <label class="label" for="cfg-ses-tpl-name"
-                        >Template Name</label
+                        >{t("template_name")}</label
                     >
                     <input
                         id="cfg-ses-tpl-name"
@@ -190,7 +195,9 @@
                     />
                 </fieldset>
                 <fieldset class="fieldset">
-                    <label class="label" for="cfg-ses-batch">Batch Size</label>
+                    <label class="label" for="cfg-ses-batch"
+                        >{t("batch_size")}</label
+                    >
                     <input
                         id="cfg-ses-batch"
                         type="number"
@@ -201,7 +208,7 @@
                         {disabled}
                     />
                     <p class="fieldset-label">
-                        Emails per SES Bulk API call (1–50)
+                        {t("emails_per_ses")}
                     </p>
                 </fieldset>
             </div>
@@ -210,10 +217,10 @@
 
     <div class="flex justify-end gap-2 mt-2">
         <button class="btn btn-ghost btn-sm" onclick={onreset} {disabled}
-            >Reset defaults</button
+            >{t("reset_defaults")}</button
         >
         <button class="btn btn-outline btn-sm" onclick={onsave} {disabled}
-            >Save as defaults</button
+            >{t("save_as_defaults")}</button
         >
     </div>
 </div>

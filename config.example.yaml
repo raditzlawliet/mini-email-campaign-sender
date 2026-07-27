@@ -1,5 +1,6 @@
 app:
   theme: dark
+  language: en
 
 server:
   port: 8080

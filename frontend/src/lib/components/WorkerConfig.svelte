@@ -1,4 +1,6 @@
 <script>
+    import { t } from "../i18n.svelte.js";
+
     let {
         concurrency = $bindable(10),
         maxRetries = $bindable(3),
@@ -13,7 +15,8 @@
 <div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
         <fieldset class="fieldset">
-            <label class="label" for="cfg-concurrency">Concurrency</label>
+            <label class="label" for="cfg-concurrency">{t("concurrency")}</label
+            >
             <input
                 id="cfg-concurrency"
                 type="number"
@@ -23,10 +26,10 @@
                 bind:value={concurrency}
                 {disabled}
             />
-            <p class="fieldset-label">Number of parallel workers (1–100)</p>
+            <p class="fieldset-label">{t("concurrency_desc")}</p>
         </fieldset>
         <fieldset class="fieldset">
-            <label class="label" for="cfg-maxretries">Max Retries</label>
+            <label class="label" for="cfg-maxretries">{t("max_retries")}</label>
             <input
                 id="cfg-maxretries"
                 type="number"
@@ -36,10 +39,12 @@
                 bind:value={maxRetries}
                 {disabled}
             />
-            <p class="fieldset-label">Retry attempts on failure (0–10)</p>
+            <p class="fieldset-label">{t("max_retries_desc")}</p>
         </fieldset>
         <fieldset class="fieldset">
-            <label class="label" for="cfg-backoff-base">Backoff Base</label>
+            <label class="label" for="cfg-backoff-base"
+                >{t("backoff_base")}</label
+            >
             <input
                 id="cfg-backoff-base"
                 type="text"
@@ -48,10 +53,11 @@
                 bind:value={backoffBase}
                 {disabled}
             />
-            <p class="fieldset-label">Initial retry delay, e.g. 1s, 500ms</p>
+            <p class="fieldset-label">{t("backoff_base_desc")}</p>
         </fieldset>
         <fieldset class="fieldset">
-            <label class="label" for="cfg-backoff-max">Backoff Max</label>
+            <label class="label" for="cfg-backoff-max">{t("backoff_max")}</label
+            >
             <input
                 id="cfg-backoff-max"
                 type="text"
@@ -60,15 +66,15 @@
                 bind:value={backoffMax}
                 {disabled}
             />
-            <p class="fieldset-label">Maximum retry delay cap</p>
+            <p class="fieldset-label">{t("backoff_max_desc")}</p>
         </fieldset>
     </div>
     <div class="flex justify-end gap-2">
         <button class="btn btn-ghost btn-sm" onclick={onreset} {disabled}
-            >Reset defaults</button
+            >{t("reset_defaults")}</button
         >
         <button class="btn btn-outline btn-sm" onclick={onsave} {disabled}
-            >Save as defaults</button
+            >{t("save_as_defaults")}</button
         >
     </div>
 </div>

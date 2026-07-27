@@ -21,7 +21,8 @@ type Config struct {
 
 // AppConfig holds application-level settings.
 type AppConfig struct {
-	Theme string `yaml:"theme"`
+	Theme    string `yaml:"theme"`
+	Language string `yaml:"language"`
 }
 
 // LogConfig holds logging configuration.
@@ -101,7 +102,7 @@ var defaultConfigYAML []byte
 // Root uses empty string. Keys not listed appear last.
 var canonicalOrder = map[string][]string{
 	"":             {"app", "server", "email", "worker", "log"},
-	"app":          {"theme"},
+	"app":          {"theme", "language"},
 	"server":       {"port"},
 	"email":        {"provider", "from", "smtp", "ses"},
 	"email.smtp":   {"host", "port", "username", "password", "tls", "batch_size"},
@@ -338,6 +339,9 @@ func Load(path string) (*Config, error) {
 
 	if cfg.App.Theme == "" {
 		cfg.App.Theme = "dark"
+	}
+	if cfg.App.Language == "" {
+		cfg.App.Language = "en"
 	}
 	if cfg.Email.Provider == "" {
 		cfg.Email.Provider = "smtp"

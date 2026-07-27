@@ -1,6 +1,7 @@
 <script>
     import { onMount } from "svelte";
-    import { Check, ChevronDown, ChevronUp } from "@lucide/svelte";
+    import { ChevronDown, ChevronUp, GlobeIcon } from "@lucide/svelte";
+    import { t, setLanguage, getLanguage, LANGS } from "../i18n.svelte.js";
 
     const THEMES = [
         "dark",
@@ -38,7 +39,34 @@
     ];
 
     let currentTheme = $state("dark");
-    let dropdownOpen = $state(false);
+    let themeDropdownOpen = $state(false);
+    let langDropdownOpen = $state(false);
+    let langRef = $state(null);
+    let themeRef = $state(null);
+
+    function toggleLang() {
+        if (langDropdownOpen) {
+            langDropdownOpen = false;
+        } else {
+            themeDropdownOpen = false;
+            langDropdownOpen = true;
+        }
+    }
+
+    function toggleTheme() {
+        if (themeDropdownOpen) {
+            themeDropdownOpen = false;
+        } else {
+            langDropdownOpen = false;
+            themeDropdownOpen = true;
+        }
+    }
+
+    function handleDocClick(e) {
+        const path = e.composedPath();
+        if (langRef && !path.includes(langRef)) langDropdownOpen = false;
+        if (themeRef && !path.includes(themeRef)) themeDropdownOpen = false;
+    }
 
     async function persistTheme(t) {
         fetch("/api/config/save", {
@@ -48,43 +76,104 @@
         }).catch(() => {});
     }
 
-    function onThemeChange(e) {
-        currentTheme = e.target.value;
-        persistTheme(currentTheme);
+    async function selectTheme(tm) {
+        currentTheme = tm;
+        document.documentElement.dataset.theme = tm;
+        themeDropdownOpen = false;
+        persistTheme(tm);
+    }
+
+    async function selectLanguage(code) {
+        setLanguage(code);
+        langDropdownOpen = false;
+        fetch("/api/config/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ app: { language: code } }),
+        }).catch(() => {});
     }
 
     onMount(async () => {
+        document.addEventListener("click", handleDocClick);
         try {
             const res = await fetch("/api/campaign/config");
             const data = await res.json();
             const t = data?.app?.theme || "dark";
+            const l = data?.app?.language || "en";
             currentTheme = t;
-            const radio = document.querySelector(
-                `input.theme-controller[value="${t}"]`,
-            );
-            if (radio) radio.checked = true;
+            document.documentElement.dataset.theme = currentTheme;
+            setLanguage(l);
         } catch {
             currentTheme = "dark";
+            setLanguage("en");
         }
+
+        return () => document.removeEventListener("click", handleDocClick);
     });
 </script>
 
-<div class="navbar bg-base-100 shadow-sm">
+<div class="navbar bg-base-100 shadow-sm h-9">
     <div class="navbar-start"></div>
     <div class="navbar-center">
-        <span class="font-bold text-xl">Mini Email Campaign Sender</span>
+        <span class="font-bold text-xl">{t("app_title")}</span>
     </div>
-    <div class="navbar-end">
+    <div class="navbar-end gap-0.5">
+        <!-- Language picker -->
         <div
             class="dropdown dropdown-end"
-            class:dropdown-open={dropdownOpen}
-            onfocusin={() => (dropdownOpen = true)}
-            onfocusout={() => (dropdownOpen = false)}
+            class:dropdown-open={langDropdownOpen}
+            bind:this={langRef}
         >
             <button
-                tabindex="0"
+                class="btn btn-sm btn-ghost gap-1 px-1.5 text-[.5625rem] font-bold"
+                aria-label={t("change_language")}
+                title={t("change_language")}
+                onclick={toggleLang}
+            >
+                <GlobeIcon class="w-4 h-4"></GlobeIcon>
+                {#if langDropdownOpen}
+                    <ChevronUp class="w-4 h-4" />
+                {:else}
+                    <ChevronDown class="w-4 h-4" />
+                {/if}
+            </button>
+            {#if langDropdownOpen}
+                <div
+                    class="dropdown-content bg-base-200 rounded-box z-1 w-56 shadow-2xl mt-1 max-h-80 overflow-y-auto"
+                >
+                    <ul class="menu menu-sm w-full">
+                        {#each LANGS as l}
+                            <li>
+                                <button
+                                    class={getLanguage() === l.code
+                                        ? "menu-active"
+                                        : ""}
+                                    onclick={() => selectLanguage(l.code)}
+                                >
+                                    <span
+                                        class="font-mono text-[.5625rem] font-bold tracking-[0.09375rem] opacity-40"
+                                        >{l.code.toUpperCase()}</span
+                                    >
+                                    <span class="font-[sans-serif]"
+                                        >{l.label}</span
+                                    >
+                                </button>
+                            </li>
+                        {/each}
+                    </ul>
+                </div>
+            {/if}
+        </div>
+
+        <!-- Theme picker -->
+        <div
+            class="dropdown dropdown-end"
+            class:dropdown-open={themeDropdownOpen}
+            bind:this={themeRef}
+        >
+            <button
                 class="btn btn-ghost btn-sm gap-2 capitalize"
-                onclick={() => (dropdownOpen = !dropdownOpen)}
+                onclick={toggleTheme}
             >
                 <div
                     class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-0.5 shadow-sm"
@@ -94,48 +183,49 @@
                     <div class="bg-secondary size-1 rounded-full"></div>
                     <div class="bg-accent size-1 rounded-full"></div>
                 </div>
-                {#if dropdownOpen}
+                {#if themeDropdownOpen}
                     <ChevronUp class="w-4 h-4" />
                 {:else}
                     <ChevronDown class="w-4 h-4" />
                 {/if}
             </button>
-            <fieldset
-                tabindex="-1"
-                class="dropdown-content bg-base-200 rounded-box z-1 w-60 p-2 shadow-2xl mt-2 max-h-80 overflow-y-auto flex flex-col gap-0.5"
-                onchange={onThemeChange}
-            >
-                {#each THEMES as t}
-                    <label
-                        class="flex cursor-pointer items-center gap-3 px-2 py-1.5 rounded-btn hover:bg-base-300 capitalize"
-                    >
-                        <input
-                            type="radio"
-                            name="app-theme"
-                            class="theme-controller hidden"
-                            value={t}
-                            checked={currentTheme === t}
-                        />
-                        <div
-                            data-theme={t}
-                            class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-1 shadow-sm"
-                        >
-                            <div
-                                class="bg-base-content size-1 rounded-full"
-                            ></div>
-                            <div class="bg-primary size-1 rounded-full"></div>
-                            <div class="bg-secondary size-1 rounded-full"></div>
-                            <div class="bg-accent size-1 rounded-full"></div>
-                        </div>
-                        <div class="truncate">{t}</div>
-                        <Check
-                            class={currentTheme === t
-                                ? "ml-auto h-3 w-3 shrink-0"
-                                : "invisible ml-auto h-3 w-3 shrink-0"}
-                        />
-                    </label>
-                {/each}
-            </fieldset>
+            {#if themeDropdownOpen}
+                <div
+                    class="dropdown-content bg-base-200 rounded-box z-1 w-48 shadow-2xl mt-1 max-h-80 overflow-y-auto"
+                >
+                    <ul class="menu menu-sm w-full">
+                        {#each THEMES as tm}
+                            <li>
+                                <button
+                                    class={currentTheme === tm
+                                        ? "menu-active capitalize"
+                                        : "capitalize"}
+                                    onclick={() => selectTheme(tm)}
+                                >
+                                    <div
+                                        data-theme={tm}
+                                        class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-1 shadow-sm"
+                                    >
+                                        <div
+                                            class="bg-base-content size-1 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="bg-primary size-1 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="bg-secondary size-1 rounded-full"
+                                        ></div>
+                                        <div
+                                            class="bg-accent size-1 rounded-full"
+                                        ></div>
+                                    </div>
+                                    <span>{tm}</span>
+                                </button>
+                            </li>
+                        {/each}
+                    </ul>
+                </div>
+            {/if}
         </div>
     </div>
 </div>

@@ -1,5 +1,6 @@
 app:
   theme: dark # daisyui theme: dark, light, cupcake, synthwave, etc.
+  language: en # UI language: en (English), id (Bahasa Indonesia)
 
 server:
   port: 8080

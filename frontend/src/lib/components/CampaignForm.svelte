@@ -13,6 +13,7 @@
         PlayIcon,
         CircleXIcon,
     } from "@lucide/svelte";
+    import { t } from "../i18n.svelte.js";
 
     // --- Input Data ---
     let csvText = $state("");
@@ -157,7 +158,7 @@
         try {
             await apiPost("/api/config/save", payload);
         } catch (e) {
-            error = "Failed to save config: " + e.message;
+            error = t("save_config_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -268,7 +269,7 @@
                     camp.state === "completed";
             }
         } catch (e) {
-            error = "Failed to load config: " + e.message;
+            error = t("load_config_failed") + " " + e.message;
         } finally {
             loading = false;
         }
@@ -321,7 +322,7 @@
             previews = data.previews || [];
             previewOpen = true;
         } catch (e) {
-            error = "Preview failed: " + e.message;
+            error = t("preview_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -350,11 +351,11 @@
 
     async function handleStart() {
         if (!manualMode && !csvFile) {
-            error = "Please provide CSV data first.";
+            error = t("please_provide_csv");
             return;
         }
         if (manualMode && !csvText.trim()) {
-            error = "Please provide CSV data first.";
+            error = t("please_provide_csv");
             return;
         }
         saving = true;
@@ -365,7 +366,7 @@
             progress.state = "running";
             logOpen = true;
         } catch (e) {
-            error = "Start failed: " + e.message;
+            error = t("start_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -376,7 +377,7 @@
         try {
             await apiPost("/api/campaign/pause", {});
         } catch (e) {
-            error = "Pause failed: " + e.message;
+            error = t("pause_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -389,7 +390,7 @@
             await apiPost("/api/campaign/resume", {});
             progress.state = "running";
         } catch (e) {
-            error = "Resume failed: " + e.message;
+            error = t("resume_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -410,7 +411,7 @@
             logEvents = [];
             logOpen = false;
         } catch (e) {
-            error = "Reset failed: " + e.message;
+            error = t("reset_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -435,7 +436,7 @@
             sesTemplateName = data.email.ses?.TemplateName || "";
             sesBatchSize = data.email.ses?.BatchSize || 50;
         } catch (e) {
-            error = "Failed to reset defaults: " + e.message;
+            error = t("reset_defaults_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -450,7 +451,7 @@
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
         } catch (e) {
-            error = "Failed to reset defaults: " + e.message;
+            error = t("reset_defaults_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -463,7 +464,7 @@
             logToFile = data.log?.campaign?.log_to_file ?? true;
             verbose = data.log?.campaign?.verbose ?? false;
         } catch (e) {
-            error = "Failed to reset defaults: " + e.message;
+            error = t("reset_defaults_failed") + " " + e.message;
         } finally {
             saving = false;
         }
@@ -476,7 +477,7 @@
             <CircleXIcon class="w-4 h-4"></CircleXIcon>
             <span>{error}</span>
             <button class="btn btn-ghost btn-sm" onclick={() => (error = "")}
-                >Dismiss</button
+                >{t("dismiss")}</button
             >
         </div>
     {/if}
@@ -484,9 +485,7 @@
     {#if loading}
         <div class="flex items-center justify-center py-20">
             <span class="loading loading-spinner loading-lg"></span>
-            <span class="ml-3 text-base-content/70"
-                >Loading configuration...</span
-            >
+            <span class="ml-3 text-base-content/70">{t("loading_config")}</span>
         </div>
     {:else}
         <InputData
@@ -512,19 +511,26 @@
             <div role="tablist" class="tabs tabs-lift">
                 <button
                     role="tab"
-                    class="tab {activeTab === 'provider' ? 'tab-active font-medium' : ''}"
+                    class="tab {activeTab === 'provider'
+                        ? 'tab-active font-medium'
+                        : ''}"
                     onclick={() => (activeTab = "provider")}
-                    >Email Provider</button
+                    >{t("email_provider_tab")}</button
                 >
                 <button
                     role="tab"
-                    class="tab {activeTab === 'worker' ? 'tab-active font-medium' : ''}"
-                    onclick={() => (activeTab = "worker")}>Worker</button
+                    class="tab {activeTab === 'worker'
+                        ? 'tab-active font-medium'
+                        : ''}"
+                    onclick={() => (activeTab = "worker")}
+                    >{t("worker_tab")}</button
                 >
                 <button
                     role="tab"
-                    class="tab {activeTab === 'log' ? 'tab-active font-medium' : ''}"
-                    onclick={() => (activeTab = "log")}>Log</button
+                    class="tab {activeTab === 'log'
+                        ? 'tab-active font-medium'
+                        : ''}"
+                    onclick={() => (activeTab = "log")}>{t("log_tab")}</button
                 >
             </div>
 
@@ -549,7 +555,7 @@
                         onreset={handleResetProvider}
                         onsave={() =>
                             showConfirm(
-                                "Save provider settings as defaults?",
+                                t("save_provider_confirm"),
                                 handleSaveProvider,
                             )}
                     />
@@ -563,7 +569,7 @@
                         onreset={handleResetWorker}
                         onsave={() =>
                             showConfirm(
-                                "Save worker settings as defaults?",
+                                t("save_worker_confirm"),
                                 handleSaveWorker,
                             )}
                     />
@@ -574,10 +580,7 @@
                         disabled={campaignRunning}
                         onreset={handleResetLog}
                         onsave={() =>
-                            showConfirm(
-                                "Save log settings as defaults?",
-                                handleSaveLog,
-                            )}
+                            showConfirm(t("save_log_confirm"), handleSaveLog)}
                     />
                 {/if}
             </div>
@@ -597,7 +600,7 @@
                         {#if saving}<span
                                 class="loading loading-spinner loading-xs"
                             ></span>{/if}
-                        Dry-Run Preview
+                        {t("dry_run_preview")}
                     </button>
                     {#if progress.state === "running"}
                         <button
@@ -605,7 +608,8 @@
                             onclick={handlePause}
                             disabled={saving}
                         >
-                            <PauseIcon class="w-4 h-4"></PauseIcon> Pause
+                            <PauseIcon class="w-4 h-4"></PauseIcon>
+                            {t("pause")}
                         </button>
                     {:else if progress.state === "paused"}
                         <button
@@ -613,7 +617,8 @@
                             onclick={handleResume}
                             disabled={saving}
                         >
-                            <PlayIcon class="w-4 h-4"></PlayIcon> Resume
+                            <PlayIcon class="w-4 h-4"></PlayIcon>
+                            {t("resume")}
                         </button>
                     {/if}
                     <button
@@ -626,19 +631,20 @@
                         {#if campaignRunning}<span
                                 class="loading loading-spinner loading-xs"
                             ></span>{/if}
-                        <PlayIcon class="w-4 h-4"></PlayIcon> Start Campaign
+                        <PlayIcon class="w-4 h-4"></PlayIcon>
+                        {t("start_campaign")}
                     </button>
                     <button
                         class="btn btn-ghost"
                         onclick={handleReset}
                         disabled={saving || progress.state === "running"}
                     >
-                        Reset
+                        {t("reset")}
                     </button>
                 </div>
                 {#if !csvText.trim()}
                     <p class="text-sm text-base-content/50">
-                        Provide CSV data to enable Preview and Start.
+                        {t("provide_csv")}
                     </p>
                 {/if}
             </div>
@@ -649,13 +655,17 @@
             <div class="card bg-base-100 shadow-sm">
                 <div class="card-body">
                     <h2 class="card-title text-lg">
-                        Progress
+                        {t("progress")}
                         {#if progress.state === "running"}
-                            <span class="badge badge-info">Running</span>
+                            <span class="badge badge-info">{t("running")}</span>
                         {:else if progress.state === "paused"}
-                            <span class="badge badge-warning">Paused</span>
+                            <span class="badge badge-warning"
+                                >{t("paused")}</span
+                            >
                         {:else if progress.state === "completed"}
-                            <span class="badge badge-success">Completed</span>
+                            <span class="badge badge-success"
+                                >{t("completed")}</span
+                            >
                         {:else}
                             <span class="badge">{progress.state}</span>
                         {/if}
@@ -666,29 +676,29 @@
                         max="100"
                     ></progress>
                     <p class="text-sm text-base-content/60">
-                        {progressPercent}% complete
+                        {progressPercent}% {t("complete_label")}
                     </p>
                     <div class="stats stats-horizontal shadow w-full">
                         <div class="stat">
-                            <div class="stat-title">Total</div>
+                            <div class="stat-title">{t("total")}</div>
                             <div class="stat-value text-lg">
                                 {progress.total}
                             </div>
                         </div>
                         <div class="stat">
-                            <div class="stat-title">Sent</div>
+                            <div class="stat-title">{t("sent")}</div>
                             <div class="stat-value text-lg text-success">
                                 {progress.sent}
                             </div>
                         </div>
                         <div class="stat">
-                            <div class="stat-title">Failed</div>
+                            <div class="stat-title">{t("failed")}</div>
                             <div class="stat-value text-lg text-error">
                                 {progress.failed}
                             </div>
                         </div>
                         <div class="stat">
-                            <div class="stat-title">Pending</div>
+                            <div class="stat-title">{t("pending")}</div>
                             <div class="stat-value text-lg text-warning">
                                 {progress.pending}
                             </div>
@@ -704,7 +714,7 @@
                         class="flex items-center justify-between w-full text-sm font-semibold"
                         onclick={() => (logOpen = !logOpen)}
                     >
-                        <span>Campaign Log ({logEvents.length})</span>
+                        <span>{t("campaign_log")} ({logEvents.length})</span>
                         <span class="text-xs">
                             {#if logOpen}
                                 <ChevronDown class="w-4 h-4" />
@@ -720,7 +730,7 @@
                         >
                             {#if logEvents.length === 0}
                                 <span class="text-base-content/40"
-                                    >Waiting for events...</span
+                                    >{t("waiting_events")}</span
                                 >
                             {:else}
                                 {#each logEvents as ev}

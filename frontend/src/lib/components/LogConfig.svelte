@@ -1,4 +1,6 @@
 <script>
+    import { t } from "../i18n.svelte.js";
+
     let {
         logToFile = $bindable(true),
         verbose = $bindable(false),
@@ -18,9 +20,9 @@
                     bind:checked={logToFile}
                     {disabled}
                 />
-                Log to file
+                {t("log_to_file")}
             </label>
-            <p class="fieldset-label text-xs">Write campaign events to logs/campaign_*.log</p>
+            <p class="fieldset-label text-xs">{t("log_to_file_desc")}</p>
         </fieldset>
 
         <fieldset class="fieldset">
@@ -31,17 +33,17 @@
                     bind:checked={verbose}
                     {disabled}
                 />
-                Verbose logging
+                {t("verbose_logging")}
             </label>
-            <p class="fieldset-label text-xs">Include per-email send/retry debug details in log and frontend</p>
+            <p class="fieldset-label text-xs">{t("verbose_logging_desc")}</p>
         </fieldset>
     </div>
     <div class="flex justify-end gap-2">
         <button class="btn btn-ghost btn-sm" onclick={onreset} {disabled}
-            >Reset defaults</button
+            >{t("reset_defaults")}</button
         >
         <button class="btn btn-outline btn-sm" onclick={onsave} {disabled}
-            >Save as defaults</button
+            >{t("save_as_defaults")}</button
         >
     </div>
 </div>

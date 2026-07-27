@@ -1,4 +1,6 @@
 <script>
+    import { t } from "../i18n.svelte.js";
+
     let {
         toField = $bindable("{name} <{email}>"),
         subject = $bindable(""),
@@ -32,10 +34,10 @@
 
 <div class="card bg-base-100 shadow-sm">
     <div class="card-body">
-        <h2 class="card-title text-lg">Email Template</h2>
+        <h2 class="card-title text-lg">{t("email_template")}</h2>
 
         <fieldset class="fieldset">
-            <label class="label" for="tpl-to">To</label>
+            <label class="label" for="tpl-to">{t("to")}</label>
             <input
                 id="tpl-to"
                 type="text"
@@ -63,14 +65,12 @@
                     ></path>
                 </svg>
                 <span>
-                    Subject and Body are defined by the SES template. Only the <strong
-                        >To</strong
-                    > field and CSV data columns are sent to SES as template variables.
+                    {t("ses_template_info")}
                 </span>
             </div>
         {:else}
             <fieldset class="fieldset">
-                <label class="label" for="tpl-subject">Subject</label>
+                <label class="label" for="tpl-subject">{t("subject")}</label>
                 <input
                     id="tpl-subject"
                     type="text"
@@ -84,11 +84,11 @@
 
             <fieldset class="fieldset">
                 <div class="flex items-center justify-between">
-                    <label class="label" for="tpl-body">Body</label>
+                    <label class="label" for="tpl-body">{t("body")}</label>
                     <button
                         class="btn btn-ghost btn-xs"
                         onclick={() => (bodyPreviewOpen = true)}
-                        title="Preview body">Preview</button
+                        title={t("preview")}>{t("preview")}</button
                     >
                 </div>
                 <textarea
@@ -109,16 +109,16 @@
     <div class="modal modal-open" role="dialog" aria-modal="true">
         <div class="modal-box max-w-2xl w-11/12">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold">Body Preview</h3>
+                <h3 class="text-lg font-bold">{t("body_preview")}</h3>
                 <button
                     class="btn btn-sm btn-circle btn-ghost"
                     onclick={() => (bodyPreviewOpen = false)}
-                    aria-label="Close">✕</button
+                    aria-label={t("close")}>✕</button
                 >
             </div>
             {#if _body}
                 <iframe
-                    title="Email body preview"
+                    title={t("body_preview")}
                     sandbox="allow-popups"
                     srcdoc={bodyPreviewHTML}
                     class="w-full border border-base-300 rounded-btn"
@@ -126,12 +126,12 @@
                 ></iframe>
             {:else}
                 <div class="py-8 text-center text-base-content/50 italic">
-                    No body content to preview.
+                    {t("no_body_content")}
                 </div>
             {/if}
             <div class="modal-action">
                 <button class="btn" onclick={() => (bodyPreviewOpen = false)}
-                    >Close</button
+                    >{t("close")}</button
                 >
             </div>
         </div>
@@ -142,7 +142,7 @@
             role="button"
             tabindex="0"
         >
-            Close
+            {t("close")}
         </div>
     </div>
 {/if}

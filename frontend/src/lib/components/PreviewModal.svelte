@@ -1,5 +1,6 @@
 <script>
     import { X, ChevronLeft, ChevronRight } from "@lucide/svelte";
+    import { t } from "../i18n.svelte.js";
 
     let { open = false, previews = [], onclose = () => {} } = $props();
 
@@ -26,19 +27,19 @@
     <div class="modal modal-open" role="dialog" aria-modal="true">
         <div class="modal-box max-w-3xl w-11/12 flex flex-col max-h-[90vh]">
             <div class="flex items-center justify-between mb-4 shrink-0">
-                <h3 class="text-lg font-bold">Email Preview</h3>
+                <h3 class="text-lg font-bold">{t("email_preview")}</h3>
                 <button
                     class="btn btn-sm btn-circle btn-ghost"
                     onclick={onclose}
-                    aria-label="Close"><X class="w-4 h-4" /></button
+                    aria-label={t("close")}><X class="w-4 h-4" /></button
                 >
             </div>
 
             {#if previews.length === 0}
                 <div class="py-8 text-center text-base-content/50">
-                    <p>No previews available.</p>
+                    <p>{t("no_previews")}</p>
                     <p class="text-sm mt-1">
-                        Click Preview to generate sample emails.
+                        {t("click_preview")}
                     </p>
                 </div>
             {:else}
@@ -48,9 +49,12 @@
                         <button
                             class="btn btn-sm btn-outline"
                             onclick={prev}
-                            disabled={current === 0}><ChevronLeft class="w-4 h-4" /></button
+                            disabled={current === 0}
+                            ><ChevronLeft class="w-4 h-4" /></button
                         >
-                        <span class="text-sm mx-1">{current + 1} of {previews.length}</span>
+                        <span class="text-sm mx-1"
+                            >{current + 1} of {previews.length}</span
+                        >
                         <button
                             class="btn btn-sm btn-outline"
                             onclick={next}
@@ -62,12 +66,13 @@
                         <button
                             role="tab"
                             class="tab {mode === 'render' ? 'tab-active' : ''}"
-                            onclick={() => (mode = "render")}>Render</button
+                            onclick={() => (mode = "render")}
+                            >{t("render")}</button
                         >
                         <button
                             role="tab"
                             class="tab {mode === 'code' ? 'tab-active' : ''}"
-                            onclick={() => (mode = "code")}>Code</button
+                            onclick={() => (mode = "code")}>{t("code")}</button
                         >
                     </div>
                 </div>
@@ -75,14 +80,19 @@
                 <!-- Header info -->
                 <div class="text-sm space-y-1 mb-3 shrink-0">
                     <div>
-                        <span class="text-base-content/50">From:</span> sender@example.com
+                        <span class="text-base-content/50"
+                            >{t("from_label")}</span
+                        > sender@example.com
                     </div>
                     <div>
-                        <span class="text-base-content/50">To:</span>
+                        <span class="text-base-content/50">{t("to_label")}</span
+                        >
                         {preview.to}
                     </div>
                     <div>
-                        <span class="text-base-content/50">Subject:</span>
+                        <span class="text-base-content/50"
+                            >{t("subject_label")}</span
+                        >
                         {preview.subject}
                     </div>
                 </div>
@@ -90,7 +100,7 @@
                 {#if mode === "render"}
                     <div class="flex-1 min-h-0">
                         <iframe
-                            title="Email render preview"
+                            title={t("email_preview")}
                             sandbox="allow-popups"
                             srcdoc={renderHTML}
                             class="w-full border border-base-300 rounded-box flex-1"
@@ -110,7 +120,7 @@
             {/if}
 
             <div class="modal-action shrink-0">
-                <button class="btn" onclick={onclose}>Close</button>
+                <button class="btn" onclick={onclose}>{t("close")}</button>
             </div>
         </div>
 
@@ -121,7 +131,7 @@
             role="button"
             tabindex="0"
         >
-            Close
+            {t("close")}
         </div>
     </div>
 {/if}

@@ -9,7 +9,8 @@ Single-page app to send personalized email campaigns to 1M recipients per campai
 - **Frontend**: Svelte 5 (runes), TailwindCSS v4, DaisyUI v5, Embed in Go binary.
 - **Backend**: Go, Go Fiber v3, `wneessen/go-mail` for email sending, `slog` for logging.
 - **Email Testing**: Mailtrap Local (`mailtrap-local`)
-- **Config**: File-based YAML for server port, email provider, retry params, log behavior, app theme. Partial save via `POST /api/config/save` with key-order preservation (yaml.Node merge).
+- **Config**: File-based YAML for server port, email provider, retry params, log behavior, app theme, UI language. Partial save via `POST /api/config/save` with key-order preservation (yaml.Node merge).
+- **Editor**: Zed with Svelte extension.
 - **Dev mode**: `DEV_MODE=true` enables CORS + API-only backend; Vite proxies `/api` to backend on `:8080`.
 
 ## Spec Flow
@@ -31,7 +32,7 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 | POST | `/api/campaign/reset` | Clear all campaign state (works on paused too) |
 | POST | `/api/config/save` | Deep-merge partial JSON into config.yaml, reload in-memory config |
 
-Config save accepts arbitrary partial JSON (e.g., `{"app":{"theme":"cupcake"}}` or `{"email":{"from":"new@test.com"}}`). Only provided keys updated; existing keys and order preserved via `yaml.Node` merge. `canonicalOrder` map enforces struct field order (app → server → email → worker → log, email.provider → email.from → email.smtp → email.ses, etc.). Reloads `DefaultConfig` in-memory after save. Theme auto-persists on change.
+Config save accepts arbitrary partial JSON (e.g., `{"app":{"theme":"cupcake"}}` or `{"app":{"language":"id"}}`). Only provided keys updated; existing keys and order preserved via `yaml.Node` merge. `canonicalOrder` map enforces struct field order (app → server → email → worker → log, app.theme → app.language, email.provider → email.from → email.smtp → email.ses, etc.). Reloads `DefaultConfig` in-memory after save. Theme and language auto-persist on change.
 
 Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `smtp_batch_size`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `ses_use_template`, `ses_template_name`, `ses_batch_size`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`, `log_to_file`, `verbose`. Preview also accepts `count`.
 
@@ -82,8 +83,9 @@ frontend/
         WorkerConfig.svelte   # concurrency, retries, backoff, Reset/Save-as-defaults buttons
         LogConfig.svelte      # log_to_file and verbose toggles, Reset/Save-as-defaults buttons
         PreviewModal.svelte   # iframe sandbox render, code tab, next/prev
-        Navbar.svelte         # title + theme picker (DaisyUI theme-controller dropdown, auto-persist)
-        ConfirmModal.svelte   # reusable confirmation dialog (title, message, confirm/cancel labels, callbacks)
+        Navbar.svelte         # title + language picker (globe icon) + theme picker (DaisyUI dropdowns, auto-persist)
+        ConfirmModal.svelte   # reusable confirmation dialog (i18n-reactive defaults)
+      i18n.svelte.js         # translations (en/ar/id), reactive $state store, RTL sync
     App.svelte             # layout shell: Navbar + CampaignForm
     main.js
     app.css               # TailwindCSS v4 + DaisyUI v5 (themes: all)
@@ -106,6 +108,9 @@ frontend/
 
 ## Svelte 5 Conventions
 
+- **i18n**: Zero-dependency reactive module (`i18n.svelte.js`). `$state` store + `t(key)` function used in all components. `$effect.root` syncs `document.documentElement.dir` (RTL for `ar`) and `lang` attribute. Language persisted to `config.yaml` via `POST /api/config/save`. Adding a language: add translations block + entry in `LANGS` array. RTL languages: add code to `RTL_LANGS` Set.
+- **Dropdown close**: Content wrapped in `{#if}` (not just DaisyUI CSS hide) to avoid hidden DOM stealing clicks. `composedPath()` for click-outside detection — survives Svelte DOM recycling.
+- **Theme**: Explicit `document.documentElement.dataset.theme` set on change, not relying on CSS `:has(.theme-controller:checked)` which breaks when radio inputs leave DOM.
 - **Local state + onblur**: Child components with `$bindable` props use local `$state` copy (`_value`) bound to inputs. Sync to parent only on `onblur` via `flush()`. Avoids INP delays from per-keystroke parent re-renders.
 - **Multipart upload**: CSV file sent via `FormData` (no manual `Content-Type` — browser sets boundary). `csvFile` prop tracked in `InputData`, used by `CampaignForm.buildFormData()` for preview/start.
 - **Form pattern**: `<fieldset class="fieldset">` wrapping `<label class="label" for="id">` + `<input id="..." class="input w-full">`.
