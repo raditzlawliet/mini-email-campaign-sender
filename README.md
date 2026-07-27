@@ -19,7 +19,8 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
 - **Session restore** — page refresh restores in-progress campaign state
 - **Campaign logging** — optional per-run JSON log file with full configuration and delivery tracking
 - **Verbose mode** — per-email debug details in frontend and log file
-- **Single binary** — Svelte 5 frontend embedded in Go binary via `//go:embed`
+- **Multi-language** — English, Arabic (RTL), and Bahasa Indonesia
+- **Theme picker** — choose from all DaisyUI themes, auto-persisted to your config
 
 ## Supported Providers
 
@@ -182,6 +183,7 @@ frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5
 
 | Method | Path                    | Purpose                                                  |
 | ------ | ----------------------- | -------------------------------------------------------- |
+| GET    | `/api/version`          | Return app version                                   |
 | GET    | `/api/campaign/config`  | Return default config + campaign state (session restore) |
 | POST   | `/api/campaign/preview` | Parse CSV (multipart) + render N sample emails           |
 | POST   | `/api/campaign/start`   | Parse CSV (multipart) + start worker pool                |
