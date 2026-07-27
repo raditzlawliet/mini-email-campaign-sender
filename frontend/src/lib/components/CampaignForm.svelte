@@ -509,21 +509,21 @@
 
         <!-- Config Tabs -->
         <div class="card">
-            <div role="tablist" class="tabs tabs-lift tabs-xl">
+            <div role="tablist" class="tabs tabs-lift">
                 <button
                     role="tab"
-                    class="tab {activeTab === 'provider' ? 'tab-active' : ''}"
+                    class="tab {activeTab === 'provider' ? 'tab-active font-medium' : ''}"
                     onclick={() => (activeTab = "provider")}
                     >Email Provider</button
                 >
                 <button
                     role="tab"
-                    class="tab {activeTab === 'worker' ? 'tab-active' : ''}"
+                    class="tab {activeTab === 'worker' ? 'tab-active font-medium' : ''}"
                     onclick={() => (activeTab = "worker")}>Worker</button
                 >
                 <button
                     role="tab"
-                    class="tab {activeTab === 'log' ? 'tab-active' : ''}"
+                    class="tab {activeTab === 'log' ? 'tab-active font-medium' : ''}"
                     onclick={() => (activeTab = "log")}>Log</button
                 >
             </div>
