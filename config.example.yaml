@@ -1,3 +1,6 @@
+app:
+  theme: dark
+
 server:
   port: 8080
 

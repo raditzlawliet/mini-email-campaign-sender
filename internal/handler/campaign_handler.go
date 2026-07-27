@@ -18,10 +18,11 @@ import (
 type Handler struct {
 	DefaultConfig *config.Config
 	Store         *store.Store
+	configPath    string
 }
 
-func NewHandler(defaultCfg *config.Config, st *store.Store) *Handler {
-	return &Handler{DefaultConfig: defaultCfg, Store: st}
+func NewHandler(defaultCfg *config.Config, st *store.Store, configPath string) *Handler {
+	return &Handler{DefaultConfig: defaultCfg, Store: st, configPath: configPath}
 }
 
 // HandleGetConfig returns default config merged with current campaign state.
@@ -200,6 +201,27 @@ func (h *Handler) HandleEvents(c fiber.Ctx) error {
 			}
 		}
 	})
+}
+
+// HandleSaveConfig accepts a partial JSON config, deep-merges it into
+// config.yaml (preserving key order), and reloads the in-memory default config.
+func (h *Handler) HandleSaveConfig(c fiber.Ctx) error {
+	body := c.Body()
+	if len(body) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": "empty body"})
+	}
+
+	if err := config.SavePartial(h.configPath, body); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to save config: " + err.Error()})
+	}
+
+	cfg, err := config.Load(h.configPath)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]any{"error": "failed to reload config: " + err.Error()})
+	}
+	h.DefaultConfig = cfg
+
+	return c.JSON(map[string]any{"status": "saved"})
 }
 
 func (h *Handler) HandleReset(c fiber.Ctx) error {

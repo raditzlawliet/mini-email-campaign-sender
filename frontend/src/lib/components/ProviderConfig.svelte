@@ -16,6 +16,7 @@
         sesBatchSize = $bindable(50),
         disabled = false,
         onreset = () => {},
+        onsave = () => {},
     } = $props();
 </script>
 
@@ -207,9 +208,12 @@
         {/if}
     {/if}
 
-    <div class="flex justify-end mt-2">
+    <div class="flex justify-end gap-2 mt-2">
         <button class="btn btn-ghost btn-sm" onclick={onreset} {disabled}
-            >Reset to defaults</button
+            >Reset defaults</button
+        >
+        <button class="btn btn-outline btn-sm" onclick={onsave} {disabled}
+            >Save as defaults</button
         >
     </div>
 </div>

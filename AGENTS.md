@@ -9,7 +9,7 @@ Single-page app to send personalized email campaigns to 1M recipients per campai
 - **Frontend**: Svelte 5 (runes), TailwindCSS v4, DaisyUI v5, Embed in Go binary.
 - **Backend**: Go, Go Fiber v3, `wneessen/go-mail` for email sending, `slog` for logging.
 - **Email Testing**: Mailtrap Local (`mailtrap-local`)
-- **Config**: File-based YAML for server port, email provider, retry params, log behavior, app theme
+- **Config**: File-based YAML for server port, email provider, retry params, log behavior, app theme. Partial save via `POST /api/config/save` with key-order preservation (yaml.Node merge).
 - **Dev mode**: `DEV_MODE=true` enables CORS + API-only backend; Vite proxies `/api` to backend on `:8080`.
 
 ## Spec Flow
@@ -29,6 +29,9 @@ ANALYZE → PLAN → CLARIFY (if needed) → EXECUTE → TEST
 | POST | `/api/campaign/resume` | Resume processing pending recipients only |
 | GET | `/api/campaign/events` | SSE stream: pushes progress + log events every 1s |
 | POST | `/api/campaign/reset` | Clear all campaign state (works on paused too) |
+| POST | `/api/config/save` | Deep-merge partial JSON into config.yaml, reload in-memory config |
+
+Config save accepts arbitrary partial JSON (e.g., `{"app":{"theme":"cupcake"}}` or `{"email":{"from":"new@test.com"}}`). Only provided keys updated; existing keys and order preserved via `yaml.Node` merge. `canonicalOrder` map enforces struct field order (app → server → email → worker → log, email.provider → email.from → email.smtp → email.ses, etc.). Reloads `DefaultConfig` in-memory after save. Theme auto-persists on change.
 
 Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or text field (`csv_text`). Other fields: `subject`, `body`, `to`, `from`, `provider`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_tls`, `smtp_batch_size`, `ses_region`, `ses_access_key_id`, `ses_secret_access_key`, `ses_use_template`, `ses_template_name`, `ses_batch_size`, `concurrency`, `max_retries`, `retry_backoff_base`, `retry_backoff_max`, `log_to_file`, `verbose`. Preview also accepts `count`.
 
@@ -62,8 +65,8 @@ Preview and Start use `multipart/form-data`. CSV sent as file (`csv_file`) or te
 ```
 cmd/server/              # main entrypoint, embedded frontend
 internal/
-  config/                # YAML config loading
-  handler/               # 7 HTTP handlers (Go Fiber v3)
+  config/                # YAML config loading, partial save (yaml.Node merge, canonical order)
+  handler/               # 8 HTTP handlers (Go Fiber v3)
   worker/                # worker pool, queue, retry logic, RunPending for resume
   email/                 # SMTP + SES senders, template rendering, batched SMTP
   store/                 # in-memory recipient status store
@@ -72,14 +75,16 @@ frontend/
   src/
     lib/
       components/
-        CampaignForm.svelte   # orchestrator: state, API calls, tabs, progress
+        CampaignForm.svelte   # orchestrator: state, API calls, tabs, progress, confirm modal
         InputData.svelte      # file picker + manual toggle + multipart file emit
         EmailTemplate.svelte  # To, Subject, Body + body preview modal
-        ProviderConfig.svelte # SMTP/SES config, batch_size, fieldset+label+input
-        WorkerConfig.svelte   # concurrency, retries, backoff
-        LogConfig.svelte      # log_to_file and verbose toggles
+        ProviderConfig.svelte # SMTP/SES config, Reset/Save-as-defaults buttons
+        WorkerConfig.svelte   # concurrency, retries, backoff, Reset/Save-as-defaults buttons
+        LogConfig.svelte      # log_to_file and verbose toggles, Reset/Save-as-defaults buttons
         PreviewModal.svelte   # iframe sandbox render, code tab, next/prev
-    App.svelte             # layout shell: navbar + theme picker (DaisyUI theme-controller), config init
+        Navbar.svelte         # title + theme picker (DaisyUI theme-controller dropdown, auto-persist)
+        ConfirmModal.svelte   # reusable confirmation dialog (title, message, confirm/cancel labels, callbacks)
+    App.svelte             # layout shell: Navbar + CampaignForm
     main.js
     app.css               # TailwindCSS v4 + DaisyUI v5 (themes: all)
 ```
@@ -94,6 +99,7 @@ frontend/
 - Campaign log file per run: `logs/campaign_<timestamp>.log` with simple JSON lines `{"time":"...","level":"...","msg":"..."}`. Controlled by `log.campaign.log_to_file` in config.
 - Verbose logging: `log.campaign.verbose: true` enables debug-level per-email events in frontend (SSE) and campaign log file. Terminal output follows slog handler level (Info by default suppresses debug).
 - CSV upload: large files (100MB+) sent via `multipart/form-data` (`csv_file` field) to `parseMultipart()` in handler. Manual input sent as `csv_text` text field. Avoids JSON body size limits.
+- Config partial save: `SavePartial(path, partialJSON)` reads existing YAML → `yaml.Node`, deep-merges partial JSON (via `mapToNode` with `canonicalOrder`), marshals without document header. Preserves existing key order; new keys appended at end in canonical order.
 - Test with `testify` (`assert`/`require`), each subtest gets its own `assert.New(t)`.
 - Slices/maps initialized explicitly (never nil).
 - Integration tests use `//go:build integration` + Mailtrap Local.
@@ -108,7 +114,8 @@ frontend/
 - **SSE**: Single `EventSource` connected on mount via `GET /api/campaign/events`, never disconnected. Streams progress + log every 1s.
 - **Session restore**: On page refresh, `GET /api/campaign/config` returns current campaign state (template, config, progress, events). Form restores to in-progress state if campaign is running/paused/completed.
 - **Form lock**: Input data, template, provider, and worker config are disabled when campaign is running or paused. Reset button disabled only when `running` (enabled on paused/completed).
-- **Icons**: Use `@lucide/svelte` for icons (Check, ChevronRight/Down/Up, X, ChevronLeft/Right, PauseIcon, PlayIcon).
+- **Save as defaults**: Each config tab has a "Save as defaults" button → `ConfirmModal` → `POST /api/config/save`. Theme picker auto-persists on change. All persist to `config.yaml`.
+- **Icons**: Use `@lucide/svelte` for icons (Check, ChevronRight/Down/Up, X, ChevronLeft/Right, PauseIcon, PlayIcon, CircleXIcon).
 - **Literal braces**: Use `{'{name}'}` syntax in template HTML to output literal `{name}`.
 
 ## Testing Rules

@@ -47,7 +47,7 @@ func main() {
 	store.InitStore()
 	st := store.GetStore()
 
-	h := handler.NewHandler(cfg, st)
+	h := handler.NewHandler(cfg, st, configPath)
 
 	app := fiber.New(fiber.Config{
 		AppName:     "Mini Email Campaign Sender",
@@ -74,6 +74,7 @@ func main() {
 	app.Post("/api/campaign/resume", h.HandleResume)
 	app.Get("/api/campaign/events", h.HandleEvents)
 	app.Post("/api/campaign/reset", h.HandleReset)
+	app.Post("/api/config/save", h.HandleSaveConfig)
 
 	if !devMode {
 		app.Use(static.New("", static.Config{

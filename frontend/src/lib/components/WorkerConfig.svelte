@@ -6,6 +6,7 @@
         backoffMax = $bindable("30s"),
         disabled = false,
         onreset = () => {},
+        onsave = () => {},
     } = $props();
 </script>
 
@@ -62,9 +63,12 @@
             <p class="fieldset-label">Maximum retry delay cap</p>
         </fieldset>
     </div>
-    <div class="flex justify-end">
+    <div class="flex justify-end gap-2">
         <button class="btn btn-ghost btn-sm" onclick={onreset} {disabled}
             >Reset defaults</button
+        >
+        <button class="btn btn-outline btn-sm" onclick={onsave} {disabled}
+            >Save as defaults</button
         >
     </div>
 </div>

@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,6 +91,135 @@ server:
 
 	t.Run("missing file", func(t *testing.T) {
 		_, err := Load("/nonexistent/config.yaml")
+		assert.Error(t, err)
+	})
+}
+
+func TestSavePartial(t *testing.T) {
+	t.Run("merge theme only", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+app:
+  theme: dark
+server:
+  port: 8080
+email:
+  provider: smtp
+worker:
+  concurrency: 10
+  max_retries: 3
+`), 0644)
+		require.NoError(err)
+
+		partial, _ := json.Marshal(map[string]any{
+			"app": map[string]any{"theme": "cupcake"},
+		})
+		err = SavePartial(path, partial)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+		assert.Equal("cupcake", cfg.App.Theme)
+		assert.Equal(8080, cfg.Server.Port)
+		assert.Equal("smtp", cfg.Email.Provider)
+	})
+
+	t.Run("merge nested config", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+app:
+  theme: dark
+email:
+  provider: smtp
+  from: old@test.com
+  smtp:
+    host: old.example.com
+    port: 587
+`), 0644)
+		require.NoError(err)
+
+		partial, _ := json.Marshal(map[string]any{
+			"email": map[string]any{
+				"from": "new@test.com",
+				"smtp": map[string]any{
+					"host": "new.example.com",
+				},
+			},
+		})
+		err = SavePartial(path, partial)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+		assert.Equal("new@test.com", cfg.Email.From)
+		assert.Equal("new.example.com", cfg.Email.SMTP.Host)
+		assert.Equal(587, cfg.Email.SMTP.Port)
+		assert.Equal("smtp", cfg.Email.Provider)
+		assert.Equal("dark", cfg.App.Theme)
+	})
+
+	t.Run("preserves key order with new key insertion", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		original := []byte(`server:
+  port: 8080
+
+email:
+  provider: smtp
+  from: sender@example.com
+  smtp:
+    host: localhost
+    port: 1025
+
+worker:
+  concurrency: 10
+  max_retries: 3
+`)
+		err := os.WriteFile(path, original, 0644)
+		require.NoError(err)
+
+		// Simulate saving theme — adds app key
+		partial, _ := json.Marshal(map[string]any{
+			"app": map[string]any{"theme": "dark"},
+		})
+		err = SavePartial(path, partial)
+		require.NoError(err)
+
+		data, err := os.ReadFile(path)
+		require.NoError(err)
+		content := string(data)
+
+		t.Logf("output:\n%s", content)
+
+		// Verify canonical order: app → server → email → worker
+		appIdx := strings.Index(content, "app:")
+		serverIdx := strings.Index(content, "server:")
+		emailIdx := strings.Index(content, "email:")
+		workerIdx := strings.Index(content, "worker:")
+
+		assert.True(appIdx >= 0, "app key should exist")
+		assert.True(serverIdx >= 0, "server key should exist")
+		assert.True(emailIdx >= 0, "email key should exist")
+		assert.True(workerIdx >= 0, "worker key should exist")
+		assert.True(appIdx < serverIdx, "app should come before server")
+		assert.True(serverIdx < emailIdx, "server should come before email")
+		assert.True(emailIdx < workerIdx, "email should come before worker")
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		partial, _ := json.Marshal(map[string]any{"app": map[string]any{"theme": "dark"}})
+		err := SavePartial("/nonexistent/config.yaml", partial)
 		assert.Error(t, err)
 	})
 }

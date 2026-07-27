@@ -5,6 +5,7 @@
     import WorkerConfig from "./WorkerConfig.svelte";
     import LogConfig from "./LogConfig.svelte";
     import PreviewModal from "./PreviewModal.svelte";
+    import ConfirmModal from "./ConfirmModal.svelte";
     import {
         ChevronRight,
         ChevronDown,
@@ -87,6 +88,80 @@
             }
         }
     });
+
+    // --- Confirm dialog ---
+    let confirmOpen = $state(false);
+    let confirmTitle = $state("");
+    let confirmAction = $state(() => {});
+
+    function showConfirm(title, action) {
+        confirmTitle = title;
+        confirmAction = action;
+        confirmOpen = true;
+    }
+
+    // --- Save handlers ---
+    async function handleSaveProvider() {
+        const payload = {
+            email: {
+                provider,
+                from: fromEmail,
+                smtp: {
+                    host: smtpHost,
+                    port: parseInt(smtpPort) || 0,
+                    username: smtpUsername,
+                    password: smtpPassword,
+                    tls: smtpTLS,
+                    batch_size: parseInt(smtpBatchSize) || 50,
+                },
+                ses: {
+                    region: sesRegion,
+                    access_key_id: sesAccessKeyId,
+                    secret_access_key: sesSecretAccessKey,
+                    use_template: sesUseTemplate,
+                    template_name: sesTemplateName,
+                    batch_size: parseInt(sesBatchSize) || 50,
+                },
+            },
+        };
+        await doSave(payload);
+    }
+
+    async function handleSaveWorker() {
+        const payload = {
+            worker: {
+                concurrency: parseInt(concurrency) || 10,
+                max_retries: parseInt(maxRetries) || 3,
+                retry_backoff_base: backoffBase || "1s",
+                retry_backoff_max: backoffMax || "30s",
+            },
+        };
+        await doSave(payload);
+    }
+
+    async function handleSaveLog() {
+        const payload = {
+            log: {
+                campaign: {
+                    log_to_file: logToFile,
+                    verbose,
+                },
+            },
+        };
+        await doSave(payload);
+    }
+
+    async function doSave(payload) {
+        saving = true;
+        error = "";
+        try {
+            await apiPost("/api/config/save", payload);
+        } catch (e) {
+            error = "Failed to save config: " + e.message;
+        } finally {
+            saving = false;
+        }
+    }
 
     let progressPercent = $derived(
         progress.total > 0
@@ -472,6 +547,11 @@
                         bind:sesBatchSize
                         disabled={campaignRunning}
                         onreset={handleResetProvider}
+                        onsave={() =>
+                            showConfirm(
+                                "Save provider settings as defaults?",
+                                handleSaveProvider,
+                            )}
                     />
                 {:else if activeTab === "worker"}
                     <WorkerConfig
@@ -481,6 +561,11 @@
                         bind:backoffMax
                         disabled={campaignRunning}
                         onreset={handleResetWorker}
+                        onsave={() =>
+                            showConfirm(
+                                "Save worker settings as defaults?",
+                                handleSaveWorker,
+                            )}
                     />
                 {:else}
                     <LogConfig
@@ -488,6 +573,11 @@
                         bind:verbose
                         disabled={campaignRunning}
                         onreset={handleResetLog}
+                        onsave={() =>
+                            showConfirm(
+                                "Save log settings as defaults?",
+                                handleSaveLog,
+                            )}
                     />
                 {/if}
             </div>
@@ -663,4 +753,14 @@
     open={previewOpen}
     {previews}
     onclose={() => (previewOpen = false)}
+/>
+
+<ConfirmModal
+    open={confirmOpen}
+    title={confirmTitle}
+    onconfirm={() => {
+        confirmAction();
+        confirmOpen = false;
+    }}
+    oncancel={() => (confirmOpen = false)}
 />
