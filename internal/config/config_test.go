@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveConfigPath(t *testing.T) {
+	t.Run("CONFIG_PATH env", func(t *testing.T) {
+		t.Setenv("CONFIG_PATH", "/custom/path/config.yaml")
+		assert.Equal(t, "/custom/path/config.yaml", ResolveConfigPath())
+	})
+
+	t.Run("local config.yaml exists", func(t *testing.T) {
+		t.Setenv("CONFIG_PATH", "")
+		tmp := t.TempDir()
+		// Create config.yaml in temp dir, then run from there.
+		oldDir, _ := os.Getwd()
+		require.NoError(t, os.Chdir(tmp))
+		defer os.Chdir(oldDir)
+
+		require.NoError(t, os.WriteFile("config.yaml", []byte("server:\n  port: 8080\n"), 0644))
+		assert.Equal(t, "config.yaml", ResolveConfigPath())
+	})
+
+	t.Run("falls back to ~/.mecs", func(t *testing.T) {
+		t.Setenv("CONFIG_PATH", "")
+		// No ./config.yaml, expect ~/.mecs/config.yaml.
+		home, _ := os.UserHomeDir()
+		expected := filepath.Join(home, ".mecs", "config.yaml")
+		assert.Equal(t, expected, ResolveConfigPath())
+	})
+}
 
 func TestLoad(t *testing.T) {
 	t.Run("valid config file", func(t *testing.T) {
@@ -89,9 +117,74 @@ server:
 		assert.Equal(3, cfg.Worker.MaxRetries)
 	})
 
-	t.Run("missing file", func(t *testing.T) {
-		_, err := Load("/nonexistent/config.yaml")
-		assert.Error(t, err)
+	t.Run("creates default config when file missing", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "subdir", "config.yaml")
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		assert.Equal("dark", cfg.App.Theme)
+		assert.Equal("en", cfg.App.Language)
+		assert.Equal(8080, cfg.Server.Port)
+		assert.Equal("smtp", cfg.Email.Provider)
+		assert.Equal(10, cfg.Worker.Concurrency)
+
+		// File should exist.
+		_, err = os.Stat(path)
+		assert.NoError(err)
+	})
+
+	t.Run("loads secrets from keyring when provider type is keyring", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+email:
+  provider: smtp
+  from: test@example.com
+  smtp:
+    host: localhost
+    port: 1025
+    username: ""
+    password: ""
+    password_provider:
+      type: keyring
+      account: ""
+      service: raditzlawliet.mecs
+    tls: false
+    batch_size: 50
+  ses:
+    region: us-east-1
+    access_key_id: ""
+    access_key_id_provider:
+      type: keyring
+      account: ""
+      service: raditzlawliet.mecs
+    secret_access_key: ""
+    secret_access_key_provider:
+      type: keyring
+      account: ""
+      service: raditzlawliet.mecs
+    use_template: false
+    template_name: ""
+    batch_size: 50
+`), 0644)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		// Keyring may or may not be available — don't assert exact values.
+		// Just verify the config loaded successfully with correct provider metadata.
+		assert.Equal("keyring", cfg.Email.SMTP.PasswordProvider.Type)
+		assert.Equal("keyring", cfg.Email.SES.AccessKeyIDProvider.Type)
+		assert.Equal("keyring", cfg.Email.SES.SecretAccessKeyProvider.Type)
 	})
 }
 
@@ -189,7 +282,6 @@ worker:
 		err := os.WriteFile(path, original, 0644)
 		require.NoError(err)
 
-		// Simulate saving theme — adds app key
 		partial, _ := json.Marshal(map[string]any{
 			"app": map[string]any{"theme": "dark"},
 		})
@@ -202,7 +294,6 @@ worker:
 
 		t.Logf("output:\n%s", content)
 
-		// Verify canonical order: app → server → email → worker
 		appIdx := strings.Index(content, "app:")
 		serverIdx := strings.Index(content, "server:")
 		emailIdx := strings.Index(content, "email:")
@@ -217,9 +308,166 @@ worker:
 		assert.True(emailIdx < workerIdx, "email should come before worker")
 	})
 
-	t.Run("missing file", func(t *testing.T) {
+	t.Run("missing file returns error", func(t *testing.T) {
+		assert := assert.New(t)
+
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "nonexistent", "config.yaml")
+
 		partial, _ := json.Marshal(map[string]any{"app": map[string]any{"theme": "dark"}})
-		err := SavePartial("/nonexistent/config.yaml", partial)
-		assert.Error(t, err)
+		err := SavePartial(path, partial)
+		assert.Error(err)
+	})
+}
+
+func TestSavePartialWithSecrets(t *testing.T) {
+	t.Run("routes SMTP password to keyring and sets provider metadata", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		original := []byte(`
+app:
+  theme: dark
+email:
+  provider: smtp
+  from: sender@example.com
+  smtp:
+    host: localhost
+    port: 1025
+    username: user
+    password: ""
+    tls: false
+    batch_size: 50
+`)
+		require.NoError(os.WriteFile(path, original, 0644))
+
+		partial, _ := json.Marshal(map[string]any{
+			"email": map[string]any{
+				"smtp": map[string]any{
+					"password": "my-secret-password",
+				},
+			},
+		})
+
+		// This may fail if keyring is unavailable (e.g., CI). That's OK.
+		err := SavePartial(path, partial)
+		if err != nil {
+			t.Logf("keyring may be unavailable, skipping: %v", err)
+			return
+		}
+
+		// YAML must not contain the secret.
+		raw, _ := os.ReadFile(path)
+		assert.NotContains(string(raw), "my-secret-password")
+		// Provider metadata must exist in YAML.
+		assert.Contains(string(raw), "password_provider:")
+		assert.Contains(string(raw), "type: keyring")
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		// Keyring may or may not be available — value comes from keyring if it is.
+		assert.Equal("keyring", cfg.Email.SMTP.PasswordProvider.Type)
+		assert.Equal("raditzlawliet.mecs", cfg.Email.SMTP.PasswordProvider.Service)
+		assert.Equal("email.smtp.password", cfg.Email.SMTP.PasswordProvider.Account)
+	})
+
+	t.Run("routes SES secrets to keyring", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		original := []byte(`
+email:
+  provider: ses
+  from: sender@example.com
+  smtp:
+    host: localhost
+    port: 1025
+    username: ""
+    password: ""
+    tls: false
+    batch_size: 50
+  ses:
+    region: us-east-1
+    access_key_id: ""
+    secret_access_key: ""
+    use_template: false
+    template_name: ""
+    batch_size: 50
+`)
+		require.NoError(os.WriteFile(path, original, 0644))
+
+		partial, _ := json.Marshal(map[string]any{
+			"email": map[string]any{
+				"ses": map[string]any{
+					"access_key_id":     "AKIATEST123",
+					"secret_access_key": "super-secret",
+				},
+			},
+		})
+
+		err := SavePartial(path, partial)
+		if err != nil {
+			t.Logf("keyring may be unavailable, skipping: %v", err)
+			return
+		}
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		// Keyring may or may not be available.
+		assert.Equal("keyring", cfg.Email.SES.AccessKeyIDProvider.Type)
+		assert.Equal("raditzlawliet.mecs", cfg.Email.SES.AccessKeyIDProvider.Service)
+		assert.Equal("email.ses.access_key_id", cfg.Email.SES.AccessKeyIDProvider.Account)
+		assert.Equal("keyring", cfg.Email.SES.SecretAccessKeyProvider.Type)
+		assert.Equal("raditzlawliet.mecs", cfg.Email.SES.SecretAccessKeyProvider.Service)
+		assert.Equal("email.ses.secret_access_key", cfg.Email.SES.SecretAccessKeyProvider.Account)
+	})
+
+	t.Run("empty password value does not overwrite", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		original := []byte(`
+email:
+  provider: smtp
+  from: sender@example.com
+  smtp:
+    host: localhost
+    port: 1025
+    username: ""
+    password: ""
+    password_provider:
+      type: keyring
+      account: ""
+      service: raditzlawliet.mecs
+    tls: false
+    batch_size: 50
+`)
+		require.NoError(os.WriteFile(path, original, 0644))
+
+		// Send partial with empty password — should not touch keyring or provider.
+		partial, _ := json.Marshal(map[string]any{
+			"email": map[string]any{
+				"smtp": map[string]any{
+					"password": "",
+				},
+			},
+		})
+
+		err := SavePartial(path, partial)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		// Password value depends on keyring state; just verify provider preserved.
+		assert.Equal("keyring", cfg.Email.SMTP.PasswordProvider.Type)
 	})
 }

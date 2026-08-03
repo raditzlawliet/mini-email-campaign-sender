@@ -31,10 +31,7 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
-	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		configPath = "config.yaml"
-	}
+	configPath := config.ResolveConfigPath()
 
 	cfg, err := config.Load(configPath)
 	if err != nil {

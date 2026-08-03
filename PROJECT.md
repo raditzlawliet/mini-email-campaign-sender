@@ -21,6 +21,8 @@ System to send a single promotional email campaign to **1,000,000 recipients**, 
   - Retry strategy for transient failures with maximum retry attempts and exponential backoff.
   - Campaign log including the form, configurationm, and delivery tracking report stored in the file logging to disk each fresh campaign run. Attempt retrying failed emails appending to the log each retry attempt
 - Simple File Configuration for Application Settings such as web server port.
+  - Priority: CONFIG_PATH env -> ./config.yaml (if exists) -> ~/.mecs/config.yaml (default)
+  - Use keyring to store sensitive data such as password, api key or similars.
 - UI default features
   - Support theme picker from daisy UI default theme collection, default is `dark`
   - Support multilingual and rtl display: en (default), id, ar
