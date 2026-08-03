@@ -107,7 +107,11 @@
                     bind:value={smtpBatchSize}
                     {disabled}
                 />
-                <p class="fieldset-label">{t("emails_per_smtp")}</p>
+                {#if smtpBatchSize > 1}
+                    <p class="text-warning text-sm mt-1">
+                        {t("smtp_batch_warning")}
+                    </p>
+                {/if}
             </fieldset>
         </div>
         <fieldset class="fieldset">

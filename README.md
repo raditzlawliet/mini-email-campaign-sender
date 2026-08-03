@@ -21,6 +21,7 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
 - **Verbose mode** — per-email debug details in frontend and log file
 - **Multi-language** — English, Arabic (RTL), and Bahasa Indonesia
 - **Theme picker** — choose from all DaisyUI themes, auto-persisted to your config
+- **Secure credentials** — SMTP and SES credentials automatically stored in OS keyring
 
 ## Supported Providers
 
@@ -49,7 +50,7 @@ Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## Configuration
 
-By default if no config provided, it will automatically created `config.yaml`.
+By default if no config provided, it will automatically create `config.yaml` on user's home directory on `.mecs` folder.
 You can edit `config.yaml` to set defaults for server, email provider, worker pool, and logging:
 
 ```yaml
@@ -86,29 +87,29 @@ log:
     verbose: false # include per-email debug detail
 ```
 
-| Section        | Key                  | Default     | Description                     |
-| -------------- | -------------------- | ----------- | ------------------------------- |
-| `server`       | `port`               | `8080`      | HTTP server port                |
-| `email`        | `provider`           | `smtp`      | Email provider: `smtp` or `ses` |
-| `email`        | `from`               | —           | Sender email address            |
-| `email.smtp`   | `host`               | `localhost` | SMTP server hostname            |
-| `email.smtp`   | `port`               | `1025`      | SMTP server port                |
-| `email.smtp`   | `username`           | —           | SMTP auth username (optional)   |
-| `email.smtp`   | `password`           | —           | SMTP auth password (optional)   |
-| `email.smtp`   | `tls`                | `false`     | Enable TLS                      |
-| `email.smtp`   | `batch_size`         | `50`        | Emails per SMTP connection      |
-| `email.ses`    | `region`             | —           | AWS region (e.g. `us-east-1`)   |
-| `email.ses`    | `access_key_id`      | —           | AWS access key ID               |
-| `email.ses`    | `secret_access_key`  | —           | AWS secret access key           |
-| `email.ses`    | `use_template`       | `false`     | Use SES template (marketing)    |
-| `email.ses`    | `template_name`      | —           | SES template name               |
-| `email.ses`    | `batch_size`         | `50`        | Emails per Bulk API call (1–50) |
-| `worker`       | `concurrency`        | `10`        | Parallel worker goroutines      |
-| `worker`       | `max_retries`        | `3`         | Max retry attempts per email    |
-| `worker`       | `retry_backoff_base` | `1s`        | Initial retry delay             |
-| `worker`       | `retry_backoff_max`  | `30s`       | Max retry delay cap             |
-| `log.campaign` | `log_to_file`        | `true`      | Write per-run JSON log file     |
-| `log.campaign` | `verbose`            | `false`     | Enable debug-level detail       |
+| Section        | Key                  | Default     | Description                                                    |
+| -------------- | -------------------- | ----------- | -------------------------------------------------------------- |
+| `server`       | `port`               | `8080`      | HTTP server port                                               |
+| `email`        | `provider`           | `smtp`      | Email provider: `smtp` or `ses`                                |
+| `email`        | `from`               | —           | Sender email address                                           |
+| `email.smtp`   | `host`               | `localhost` | SMTP server hostname                                           |
+| `email.smtp`   | `port`               | `1025`      | SMTP server port                                               |
+| `email.smtp`   | `username`           | —           | SMTP auth username (optional)                                  |
+| `email.smtp`   | `password`           | —           | SMTP auth password (optional), automatically stored to keyring |
+| `email.smtp`   | `tls`                | `false`     | Enable TLS                                                     |
+| `email.smtp`   | `batch_size`         | `50`        | Emails per SMTP connection                                     |
+| `email.ses`    | `region`             | —           | AWS region (e.g. `us-east-1`)                                  |
+| `email.ses`    | `access_key_id`      | —           | AWS access key ID, automatically stored to keyring             |
+| `email.ses`    | `secret_access_key`  | —           | AWS secret access key, automatically stored to keyring         |
+| `email.ses`    | `use_template`       | `false`     | Use SES template (marketing)                                   |
+| `email.ses`    | `template_name`      | —           | SES template name                                              |
+| `email.ses`    | `batch_size`         | `50`        | Emails per Bulk API call (1–50)                                |
+| `worker`       | `concurrency`        | `10`        | Parallel worker goroutines                                     |
+| `worker`       | `max_retries`        | `3`         | Max retry attempts per email                                   |
+| `worker`       | `retry_backoff_base` | `1s`        | Initial retry delay                                            |
+| `worker`       | `retry_backoff_max`  | `30s`       | Max retry delay cap                                            |
+| `log.campaign` | `log_to_file`        | `true`      | Write per-run JSON log file                                    |
+| `log.campaign` | `verbose`            | `false`     | Enable debug-level detail                                      |
 
 ## Development
 
@@ -183,7 +184,7 @@ frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5
 
 | Method | Path                    | Purpose                                                  |
 | ------ | ----------------------- | -------------------------------------------------------- |
-| GET    | `/api/version`          | Return app version                                   |
+| GET    | `/api/version`          | Return app version                                       |
 | GET    | `/api/campaign/config`  | Return default config + campaign state (session restore) |
 | POST   | `/api/campaign/preview` | Parse CSV (multipart) + render N sample emails           |
 | POST   | `/api/campaign/start`   | Parse CSV (multipart) + start worker pool                |
