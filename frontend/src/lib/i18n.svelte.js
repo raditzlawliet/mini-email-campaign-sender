@@ -6,6 +6,7 @@ const translations = {
 
     input_data: "Input Data",
     manual_input: "Manual input",
+    choose_csv_file: "Choose CSV file...",
     csv_format: "Format:",
     csv: "CSV",
     with_header_row_requires: "with header row. Requires an",
@@ -122,6 +123,7 @@ const translations = {
 
     input_data: "بيانات الإدخال",
     manual_input: "إدخال يدوي",
+    choose_csv_file: "اختر ملف CSV...",
     csv_format: "التنسيق:",
     csv: "CSV",
     with_header_row_requires: "بصف رأس. يتطلب عمود",
@@ -237,6 +239,7 @@ const translations = {
 
     input_data: "Data Input",
     manual_input: "Input manual",
+    choose_csv_file: "Pilih file CSV...",
     csv_format: "Format:",
     csv: "CSV",
     with_header_row_requires: "dengan baris header. Memerlukan kolom",

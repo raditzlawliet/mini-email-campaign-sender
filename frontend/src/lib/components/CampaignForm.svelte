@@ -14,10 +14,21 @@
         CircleXIcon,
     } from "@lucide/svelte";
     import { t } from "../i18n.svelte.js";
+    import {
+        GetCampaignConfig,
+        GetVersion,
+        Preview,
+        StartCampaign,
+        PauseCampaign,
+        ResumeCampaign,
+        ResetCampaign,
+        SaveConfig,
+    } from "../wailsjs/go/app/App";
+    import { EventsOn } from "../wailsjs/runtime/runtime";
 
     // --- Input Data ---
     let csvText = $state("");
-    let csvFile = $state(null);
+    let csvFilePath = $state("");
     let csvHeaders = $state([]);
     let csvCount = $state(0);
     let manualMode = $state(false);
@@ -156,7 +167,7 @@
         saving = true;
         error = "";
         try {
-            await apiPost("/api/config/save", payload);
+            await SaveConfig(JSON.stringify(payload));
         } catch (e) {
             error = t("save_config_failed") + " " + e.message;
         } finally {
@@ -172,37 +183,18 @@
             : 0,
     );
 
-    // --- api ---
-    async function apiGet(path) {
-        const res = await fetch(path);
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-    }
-    async function apiPost(path, body) {
-        const res = await fetch(path, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.statusText);
-        return data;
-    }
-    async function apiPostFormData(path, fd) {
-        const res = await fetch(path, {
-            method: "POST",
-            body: fd,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.statusText);
-        return data;
+    // --- api (Wails bindings) ---
+    // Bound methods return Promises; Go errors reject with an Error.
+    function bindingError(e) {
+        const msg = e && e.message ? e.message : String(e);
+        return msg.replace(/^Error: /, "");
     }
 
     async function loadDefaults() {
         loading = true;
         error = "";
         try {
-            const data = await apiGet("/api/campaign/config");
+            const data = await GetCampaignConfig();
             // Default config
             fromEmail = data.email.from || "";
             provider = data.email.provider || "smtp";
@@ -279,78 +271,62 @@
         loadDefaults();
     });
 
-    function buildFormData() {
-        const fd = new FormData();
-        if (!manualMode && csvFile) {
-            fd.append("csv_file", csvFile);
-        } else {
-            fd.append("csv_text", csvText);
-        }
-        fd.append("subject", subject);
-        fd.append("body", body);
-        fd.append("to", toField);
-        fd.append("from", fromEmail);
-        fd.append("provider", provider);
-        fd.append("smtp_host", smtpHost);
-        fd.append("smtp_port", smtpPort);
-        fd.append("smtp_username", smtpUsername);
-        fd.append("smtp_password", smtpPassword);
-        fd.append("smtp_tls", String(smtpTLS));
-        fd.append("ses_region", sesRegion);
-        fd.append("ses_access_key_id", sesAccessKeyId);
-        fd.append("ses_secret_access_key", sesSecretAccessKey);
-        fd.append("ses_use_template", String(sesUseTemplate));
-        fd.append("ses_template_name", sesTemplateName);
-        fd.append("ses_batch_size", String(sesBatchSize));
-        fd.append("concurrency", String(concurrency));
-        fd.append("max_retries", String(maxRetries));
-        fd.append("smtp_batch_size", String(smtpBatchSize));
-        fd.append("retry_backoff_base", backoffBase);
-        fd.append("retry_backoff_max", backoffMax);
-        fd.append("log_to_file", String(logToFile));
-        fd.append("verbose", String(verbose));
-        return fd;
+    function buildInput() {
+        return {
+            CSVText: manualMode ? csvText : "",
+            CSVFilePath: !manualMode ? csvFilePath : "",
+            Subject: subject,
+            Body: body,
+            To: toField,
+            From: fromEmail,
+            Provider: provider,
+            SMTPHost: smtpHost,
+            SMTPPort: parseInt(smtpPort) || 0,
+            SMTPUsername: smtpUsername,
+            SMTPPassword: smtpPassword,
+            SMTPTLS: smtpTLS,
+            SMTPBatchSize: parseInt(smtpBatchSize) || 50,
+            SESRegion: sesRegion,
+            SESAccessKeyID: sesAccessKeyId,
+            SESSecretKey: sesSecretAccessKey,
+            SESUseTemplate: sesUseTemplate,
+            SESTemplateName: sesTemplateName,
+            SESBatchSize: parseInt(sesBatchSize) || 50,
+            Concurrency: parseInt(concurrency) || 10,
+            MaxRetries: parseInt(maxRetries) || 3,
+            BackoffBase: backoffBase,
+            BackoffMax: backoffMax,
+            LogToFile: logToFile,
+            Verbose: verbose,
+            Count: 0,
+        };
     }
 
     async function handlePreview() {
         saving = true;
         error = "";
         try {
-            const fd = buildFormData();
-            fd.append("count", "5");
-            const data = await apiPostFormData("/api/campaign/preview", fd);
-            previews = data.previews || [];
+            const input = buildInput();
+            input.Count = 5;
+            previews = await Preview(input);
             previewOpen = true;
         } catch (e) {
-            error = t("preview_failed") + " " + e.message;
+            error = t("preview_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
     }
 
-    let eventSource;
-
-    function initSSE() {
-        eventSource = new EventSource("/api/campaign/events");
-        eventSource.onmessage = (e) => {
-            try {
-                const data = JSON.parse(e.data);
-                progress = data.progress;
-                logEvents = data.events || [];
-            } catch (_) {}
-        };
-        eventSource.onerror = () => {
-            eventSource.close();
-            setTimeout(initSSE, 3000);
-        };
-    }
-
     $effect(() => {
-        initSSE();
+        // Wails Events replace the old SSE stream; never disconnected.
+        EventsOn("campaign:progress", (data) => {
+            if (data && data.progress) progress = data.progress;
+            if (data && data.events) logEvents = data.events;
+        });
     });
 
     async function handleStart() {
-        if (!manualMode && !csvFile) {
+        if (!manualMode && !csvFilePath) {
             error = t("please_provide_csv");
             return;
         }
@@ -362,11 +338,11 @@
         error = "";
         logEvents = [];
         try {
-            await apiPostFormData("/api/campaign/start", buildFormData());
+            await StartCampaign(buildInput());
             progress.state = "running";
             logOpen = true;
         } catch (e) {
-            error = t("start_failed") + " " + e.message;
+            error = t("start_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -375,9 +351,9 @@
     async function handlePause() {
         saving = true;
         try {
-            await apiPost("/api/campaign/pause", {});
+            await PauseCampaign();
         } catch (e) {
-            error = t("pause_failed") + " " + e.message;
+            error = t("pause_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -387,10 +363,10 @@
         saving = true;
         error = "";
         try {
-            await apiPost("/api/campaign/resume", {});
+            await ResumeCampaign();
             progress.state = "running";
         } catch (e) {
-            error = t("resume_failed") + " " + e.message;
+            error = t("resume_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -400,7 +376,7 @@
         saving = true;
         error = "";
         try {
-            await apiPost("/api/campaign/reset", {});
+            await ResetCampaign();
             progress = {
                 total: 0,
                 sent: 0,
@@ -411,7 +387,7 @@
             logEvents = [];
             logOpen = false;
         } catch (e) {
-            error = t("reset_failed") + " " + e.message;
+            error = t("reset_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -420,7 +396,7 @@
     async function handleResetProvider() {
         saving = true;
         try {
-            const data = await apiGet("/api/campaign/config");
+            const data = await GetCampaignConfig();
             fromEmail = data.email.from || "";
             provider = data.email.provider || "smtp";
             smtpHost = data.email.smtp?.Host || "";
@@ -436,7 +412,7 @@
             sesTemplateName = data.email.ses?.TemplateName || "";
             sesBatchSize = data.email.ses?.BatchSize || 50;
         } catch (e) {
-            error = t("reset_defaults_failed") + " " + e.message;
+            error = t("reset_defaults_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -445,13 +421,13 @@
     async function handleResetWorker() {
         saving = true;
         try {
-            const data = await apiGet("/api/campaign/config");
+            const data = await GetCampaignConfig();
             concurrency = data.worker?.Concurrency || 10;
             maxRetries = data.worker?.MaxRetries || 3;
             backoffBase = data.worker?.RetryBackoffBase?.toString() || "1s";
             backoffMax = data.worker?.RetryBackoffMax?.toString() || "30s";
         } catch (e) {
-            error = t("reset_defaults_failed") + " " + e.message;
+            error = t("reset_defaults_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -460,11 +436,11 @@
     async function handleResetLog() {
         saving = true;
         try {
-            const data = await apiGet("/api/campaign/config");
+            const data = await GetCampaignConfig();
             logToFile = data.log?.campaign?.log_to_file ?? true;
             verbose = data.log?.campaign?.verbose ?? false;
         } catch (e) {
-            error = t("reset_defaults_failed") + " " + e.message;
+            error = t("reset_defaults_failed") + " " + bindingError(e);
         } finally {
             saving = false;
         }
@@ -490,7 +466,7 @@
     {:else}
         <InputData
             bind:csvText
-            bind:csvFile
+            bind:csvFilePath
             bind:csvHeaders
             bind:csvCount
             bind:manualMode
@@ -594,7 +570,7 @@
                         class="btn btn-outline"
                         onclick={handlePreview}
                         disabled={saving ||
-                            (!manualMode && !csvFile && !csvText.trim()) ||
+                            (!manualMode && !csvFilePath && !csvText.trim()) ||
                             campaignRunning}
                     >
                         {#if saving}<span
@@ -625,7 +601,7 @@
                         class="btn btn-primary"
                         onclick={handleStart}
                         disabled={saving ||
-                            (!manualMode && !csvFile && !csvText.trim()) ||
+                            (!manualMode && !csvFilePath && !csvText.trim()) ||
                             campaignRunning}
                     >
                         {#if campaignRunning}<span
