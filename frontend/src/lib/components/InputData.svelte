@@ -1,9 +1,10 @@
 <script>
     import { t } from "../i18n.svelte.js";
+    import { PickCSVFile, ParseCSVFile } from "../wailsjs/go/app/App";
 
     let {
         csvText = $bindable(""),
-        csvFile = $bindable(null),
+        csvFilePath = $bindable(""),
         csvHeaders = $bindable([]),
         csvCount = $bindable(0),
         manualMode = $bindable(false),
@@ -16,36 +17,45 @@
         _csvText = csvText;
     });
 
+    let picking = $state(false);
+
     function flushCSV() {
         csvText = _csvText;
-        csvFile = null;
+        csvFilePath = "";
         parseLocal(_csvText);
     }
 
-    function handleFile(e) {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        fileName = file.name;
-        csvFile = file;
-        csvText = "";
-        _csvText = "";
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            parseLocal(ev.target.result);
-        };
-        reader.readAsText(file);
+    async function handlePickFile() {
+        picking = true;
+        try {
+            const path = await PickCSVFile();
+            if (!path) return;
+            csvFilePath = path;
+            csvText = "";
+            _csvText = "";
+            fileName = path.split(/[\\/]/).pop() || path;
+            try {
+                const data = await ParseCSVFile(path);
+                csvHeaders = data.headers || [];
+                csvCount = data.count || 0;
+            } catch (e) {
+                csvHeaders = [];
+                csvCount = 0;
+                console.error("failed to parse CSV", e);
+            }
+        } finally {
+            picking = false;
+        }
     }
 
     function toggleManual() {
         manualMode = !manualMode;
-        csvFile = null;
+        csvFilePath = "";
         if (manualMode) {
             fileName = "";
             _csvText = "";
             csvText = "";
             parseLocal("");
-            const input = document.getElementById("csv-file-input");
-            if (input) input.value = "";
         } else {
             _csvText = "";
             csvText = "";
@@ -98,14 +108,16 @@
         </div>
 
         {#if !manualMode}
-            <input
-                id="csv-file-input"
-                type="file"
-                accept=".csv"
-                class="file-input file-input-bordered w-full"
-                onchange={handleFile}
+            <button
+                class="btn btn-outline w-full"
+                onclick={handlePickFile}
                 {disabled}
-            />
+            >
+                {#if picking}<span
+                        class="loading loading-spinner loading-xs"
+                    ></span>{/if}
+                {t("choose_csv_file")}
+            </button>
         {:else}
             <textarea
                 class="textarea textarea-bordered font-mono text-sm w-full"

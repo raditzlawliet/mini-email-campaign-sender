@@ -1,10 +1,14 @@
 bin/
 frontend/dist/
 frontend/node_modules/
+frontend/package.json.md5
+frontend/src/lib/wailsjs/
 cmd/server/frontend_dist/
+build/
 logs/
 *.log
 config.yaml
+nul
 
 # Generated CSV data
 tools/gencsv/*.exe

@@ -1,27 +1,25 @@
-.PHONY: build test test-integration dev dev-fe dev-be clean
+.PHONY: build build-windows build-linux build-all dev test test-integration clean
 
 VERSION ?= dev
-FRONTEND_DIR := frontend
-EMBED_DIR := cmd/server/frontend_dist
 
-ifeq ($(OS),Windows_NT)
-	BINARY := bin/mecs.exe
-else
-	BINARY := bin/mecs
-endif
+# Current OS build (dev/test)
+build:
+	wails build -ldflags "-X main.version=$(VERSION)"
 
-LDFLAGS := -s -w -X main.version=$(VERSION)
+# Windows build (amd64) + NSIS installer
+build-windows:
+	wails build -platform windows/amd64 -nsis -ldflags "-X main.version=$(VERSION)"
 
-build: build-frontend copy-frontend
-	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/server
+# Linux build (amd64)
+build-linux:
+	wails build -platform linux/amd64 -ldflags "-X main.version=$(VERSION)"
 
-build-frontend:
-	cd $(FRONTEND_DIR) && npm install && npm run build
+# Build both platforms
+build-all: build-windows build-linux
 
-copy-frontend:
-	rm -rf $(EMBED_DIR)
-	mkdir -p $(EMBED_DIR)
-	cp -r $(FRONTEND_DIR)/dist/* $(EMBED_DIR)/
+# Development mode with hot-reload (Go + Vite)
+dev:
+	wails dev
 
 test:
 	go test ./...
@@ -29,17 +27,5 @@ test:
 test-integration:
 	go test -tags=integration ./...
 
-# Production mode: single binary with embedded frontend
-dev:
-	go run ./cmd/server
-
-# Backend only (API + CORS) — pair with dev-fe for hot-reload workflow
-dev-be:
-	DEV_MODE=true go run ./cmd/server
-
-# Frontend dev server with hot-reload, proxies /api to backend
-dev-fe:
-	cd $(FRONTEND_DIR) && npm install && npm run dev
-
 clean:
-	rm -rf $(BINARY) $(FRONTEND_DIR)/dist $(EMBED_DIR) logs/
+	rm -rf build frontend/dist frontend/src/lib/wailsjs

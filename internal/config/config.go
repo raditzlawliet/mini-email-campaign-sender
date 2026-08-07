@@ -17,7 +17,6 @@ import (
 // Config holds the full application configuration.
 type Config struct {
 	App    AppConfig    `yaml:"app"`
-	Server ServerConfig `yaml:"server"`
 	Email  EmailConfig  `yaml:"email"`
 	Worker WorkerConfig `yaml:"worker"`
 	Log    LogConfig    `yaml:"log"`
@@ -38,11 +37,6 @@ type LogConfig struct {
 type CampaignLogConfig struct {
 	LogToFile bool `yaml:"log_to_file"`
 	Verbose   bool `yaml:"verbose"`
-}
-
-// ServerConfig holds HTTP server settings.
-type ServerConfig struct {
-	Port int `yaml:"port"`
 }
 
 // EmailConfig holds the default email provider configuration.
@@ -103,7 +97,6 @@ type rawWorkerConfig struct {
 // rawConfig mirrors Config but uses rawWorkerConfig for duration parsing.
 type rawConfig struct {
 	App    AppConfig       `yaml:"app"`
-	Server ServerConfig    `yaml:"server"`
 	Email  EmailConfig     `yaml:"email"`
 	Worker rawWorkerConfig `yaml:"worker"`
 	Log    LogConfig       `yaml:"log"`
@@ -125,9 +118,8 @@ var sensitiveKeyPaths = map[string]bool{
 // by full path (dot-separated), matching the struct field declarations.
 // Root uses empty string. Keys not listed appear last.
 var canonicalOrder = map[string][]string{
-	"":             {"app", "server", "email", "worker", "log"},
+	"":             {"app", "email", "worker", "log"},
 	"app":          {"theme", "language"},
-	"server":       {"port"},
 	"email":        {"provider", "from", "smtp", "ses"},
 	"email.smtp":   {"host", "port", "username", "password", "password_provider", "tls", "batch_size"},
 	"email.ses":    {"region", "access_key_id", "access_key_id_provider", "secret_access_key", "secret_access_key_provider", "use_template", "template_name", "batch_size"},
@@ -512,9 +504,8 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		App:    raw.App,
-		Server: raw.Server,
-		Email:  raw.Email,
+		App:   raw.App,
+		Email: raw.Email,
 		Worker: WorkerConfig{
 			Concurrency:      raw.Worker.Concurrency,
 			MaxRetries:       raw.Worker.MaxRetries,

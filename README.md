@@ -1,6 +1,6 @@
 # MECS - Mini Email Campaign Sender
 
-Send personalized email campaigns via SMTP or Amazon SES, with real-time progress tracking, pause/resume, retry logic, and a clean web interface.
+Desktop app (Wails v2) to send personalized email campaigns via SMTP or Amazon SES, with real-time progress tracking, pause/resume, retry logic, and a clean desktop UI.
 
 <p align="center">
   <img src="./docs/preview.gif" alt="Preview">
@@ -8,15 +8,15 @@ Send personalized email campaigns via SMTP or Amazon SES, with real-time progres
 
 ## Features
 
-- **CSV input** via file upload or manual paste, with header-based `{placeholder}` personalization
-- **Pre-configured defaults** from `config.yaml` — all settings overridable per campaign in the web UI
+- **CSV input** via native file picker or manual paste, with header-based `{placeholder}` personalization
+- **Pre-configured defaults** from `config.yaml` — all settings overridable per campaign in the UI
 - **Dry-run preview** — render sample emails in sandboxed iframes (Render/Code tabs) without sending
 - **Email providers** — SMTP, SES, and SES Templates (see [Supported Providers](#supported-providers) below)
 - **Worker pool** — concurrent goroutines with per-worker dedicated sender instances
 - **Retry logic** — exponential backoff with configurable max attempts and base/max durations
 - **Pause / Resume** — graceful pause (in-flight email completes), resume processes only pending recipients
-- **Real-time progress** — SSE stream pushes progress bar + log events to frontend every 1s
-- **Session restore** — page refresh restores in-progress campaign state
+- **Real-time progress** — Wails Events push progress bar + log events to frontend every 1s
+- **Session restore** — app restart restores in-progress campaign state
 - **Campaign logging** — optional per-run JSON log file with full configuration and delivery tracking
 - **Verbose mode** — per-email debug details in frontend and log file
 - **Multi-language** — English, Arabic (RTL), and Bahasa Indonesia
@@ -46,17 +46,12 @@ chmod +x ./mecs
 ./mecs.exe
 ```
 
-Open [http://localhost:8080](http://localhost:8080) in your browser.
-
 ## Configuration
 
 By default if no config provided, it will automatically create `config.yaml` on user's home directory on `.mecs` folder.
-You can edit `config.yaml` to set defaults for server, email provider, worker pool, and logging:
+You can edit `config.yaml` to set defaults for email provider, worker pool, and logging:
 
 ```yaml
-server:
-  port: 8080
-
 email:
   provider: smtp # "smtp" or "ses"
   from: "sender@example.com"
@@ -89,7 +84,6 @@ log:
 
 | Section        | Key                  | Default     | Description                                                    |
 | -------------- | -------------------- | ----------- | -------------------------------------------------------------- |
-| `server`       | `port`               | `8080`      | HTTP server port                                               |
 | `email`        | `provider`           | `smtp`      | Email provider: `smtp` or `ses`                                |
 | `email`        | `from`               | —           | Sender email address                                           |
 | `email.smtp`   | `host`               | `localhost` | SMTP server hostname                                           |
@@ -115,21 +109,20 @@ log:
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.25+
 - Node.js 20+
+- [Wails CLI](https://wails.io/docs/gettingstarted/installation) v2.13.0 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0`)
 - [Mailpit](https://github.com/axllent/mailpit) (for email testing)
+- **Windows**: WebView2 runtime (pre-installed on Windows 11)
+- **Linux**: WebKitGTK (`libwebkit2gtk-4.1-dev`) and GTK3 dev packages
 
 ### Run in development mode
 
 ```bash
-# Terminal 1: Backend (API only + CORS for :5173)
-make dev-be
-
-# Terminal 2: Frontend (Vite HMR, proxies /api to :8080)
-make dev-fe
+make dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Runs `wails dev` — hot-reload for both Go backend and Svelte frontend (Vite).
 
 ### Email testing with Mailpit
 
@@ -149,59 +142,67 @@ make test-integration     # Integration tests (requires Mailpit)
 ## Build
 
 ```bash
-make build
+make build                # Current OS
+make build-windows        # Windows amd64 + NSIS installer
+make build-linux          # Linux amd64
+make build-all            # Both platforms
 ```
 
-Produces a single binary at `bin/mecs` (`bin/mecs.exe` on Windows) with the frontend embedded.
+Produces binaries in `build/bin/` with the frontend embedded.
 
 ## Makefile Targets
 
-| Target                  | Purpose                               |
-| ----------------------- | ------------------------------------- |
-| `make build`            | Build frontend + embed + Go binary    |
-| `make dev`              | Production mode single binary         |
-| `make dev-be`           | Backend only (API + CORS for `:5173`) |
-| `make dev-fe`           | Vite dev server with HMR              |
-| `make test`             | `go test ./...`                       |
-| `make test-integration` | Integration tests                     |
-| `make clean`            | Remove build artifacts                |
+| Target              | Purpose                               |
+| ------------------- | ------------------------------------- |
+| `make build`        | Current-OS Wails build                |
+| `make build-windows`| Windows amd64 + NSIS installer        |
+| `make build-linux`  | Linux amd64 binary                    |
+| `make build-all`    | Build both platforms                  |
+| `make dev`          | `wails dev` (Go + Vite hot-reload)    |
+| `make test`         | `go test ./...`                       |
+| `make test-integration` | Integration tests                 |
+| `make clean`        | Remove build artifacts                |
 
 ## Architecture
 
 ```
-cmd/server/              # Entry point, embeds frontend, SSE
+main.go                  # Wails entry point (bindings, asset server)
 internal/
+  app/                   # Wails App struct + bound methods (replaces HTTP handlers)
   config/                # YAML configuration
-  handler/               # HTTP handlers (Go Fiber v3) + multipart parsing
   worker/                # Worker pool, retry, RunPending for resume
   email/                 # SMTP (batched) & SES senders, template rendering
   store/                 # In-memory campaign state, event log, verbose flag
   campaign/              # CSV parsing, campaign orchestration, file logging
-frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5
+frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5 (Wails WebView)
 ```
 
-## API Endpoints
+## Wails Bindings
 
-| Method | Path                    | Purpose                                                  |
-| ------ | ----------------------- | -------------------------------------------------------- |
-| GET    | `/api/version`          | Return app version                                       |
-| GET    | `/api/campaign/config`  | Return default config + campaign state (session restore) |
-| POST   | `/api/campaign/preview` | Parse CSV (multipart) + render N sample emails           |
-| POST   | `/api/campaign/start`   | Parse CSV (multipart) + start worker pool                |
-| POST   | `/api/campaign/pause`   | Gracefully pause campaign                                |
-| POST   | `/api/campaign/resume`  | Resume pending recipients                                |
-| GET    | `/api/campaign/events`  | SSE stream: progress + log every 1s                      |
-| POST   | `/api/campaign/reset`   | Clear all campaign state                                 |
+| Method              | Purpose                                                                 |
+| ------------------- | ----------------------------------------------------------------------- |
+| `GetVersion`        | Return app version (set via `-ldflags -X main.version`)                 |
+| `GetCampaignConfig` | Return default configuration + current campaign state (session restore) |
+| `Preview`           | Parse CSV (text or file path) + render N sample emails                  |
+| `StartCampaign`     | Parse CSV (text or file path) + start worker pool                       |
+| `PauseCampaign`     | Gracefully pause (wait for in-flight send, cancel ctx)                  |
+| `ResumeCampaign`    | Resume processing pending recipients only                               |
+| `ResetCampaign`     | Clear all campaign state (works on paused too)                          |
+| `SaveConfig`        | Deep-merge partial JSON into config.yaml, reload in-memory config       |
+| `PickCSVFile`       | Native file dialog, returns CSV path (Go reads file)                    |
+| `ParseCSVFile`      | Parse picked CSV, return headers + recipient count                      |
+
+Progress + log events stream via Wails Events (`campaign:progress`), emitted from Go every 1s.
 
 ## Campaign Flow
 
-1. **Input Data** — Upload a `.csv` file or paste CSV manually. First row is headers, requires an `email` column. Available headers shown as copyable badges.
+1. **Input Data** — Pick a `.csv` file via native dialog or paste CSV manually. First row is headers, requires an `email` column. Available headers shown as copyable badges.
 2. **Email Template** — Configure To, Subject, and Body with `{placeholder}` variables matching CSV headers.
 3. **Email Provider** — Select SMTP or SES (defaults from `config.yaml`). Override host, port, credentials, TLS, and batch size per campaign. SES supports template mode for marketing emails — when enabled, subject/body are defined by the SES template and CSV data becomes template variables, sent via batched `SendBulkTemplatedEmail`.
 4. **Worker Config** — Adjust concurrency, max retries, and backoff settings.
 5. **Log Config** — Toggle per-run file logging and verbose debug output.
 6. **Dry-Run Preview** — Render sample emails in sandboxed iframes (Render/Code tabs) without sending.
-7. **Start Campaign** — Begin sending. Real-time progress bar and log stream via SSE.
+7. **Start Campaign** — Begin sending. Real-time progress bar and log stream via Wails Events.
 8. **Pause / Resume** — Pause gracefully (in-flight email completes). Resume processes only pending recipients.
 9. **Reset** — Clear all state and start fresh.
 
