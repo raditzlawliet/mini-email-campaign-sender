@@ -47,8 +47,6 @@ func TestLoad(t *testing.T) {
 		tmp := t.TempDir()
 		path := tmp + "/config.yaml"
 		err := os.WriteFile(path, []byte(`
-server:
-  port: 9090
 email:
   provider: ses
   from: test@example.com
@@ -76,7 +74,6 @@ worker:
 		cfg, err := Load(path)
 		require.NoError(err)
 
-		assert.Equal(9090, cfg.Server.Port)
 		assert.Equal("ses", cfg.Email.Provider)
 		assert.Equal("test@example.com", cfg.Email.From)
 		assert.Equal("smtp.test.com", cfg.Email.SMTP.Host)
@@ -103,15 +100,14 @@ worker:
 		tmp := t.TempDir()
 		path := tmp + "/config.yaml"
 		err := os.WriteFile(path, []byte(`
-server:
-  port: 8080
+email:
+  provider: smtp
 `), 0644)
 		require.NoError(err)
 
 		cfg, err := Load(path)
 		require.NoError(err)
 
-		assert.Equal(8080, cfg.Server.Port)
 		assert.Equal("smtp", cfg.Email.Provider)
 		assert.Equal(10, cfg.Worker.Concurrency)
 		assert.Equal(3, cfg.Worker.MaxRetries)
@@ -129,7 +125,6 @@ server:
 
 		assert.Equal("dark", cfg.App.Theme)
 		assert.Equal("en", cfg.App.Language)
-		assert.Equal(8080, cfg.Server.Port)
 		assert.Equal("smtp", cfg.Email.Provider)
 		assert.Equal(10, cfg.Worker.Concurrency)
 
@@ -198,8 +193,6 @@ func TestSavePartial(t *testing.T) {
 		err := os.WriteFile(path, []byte(`
 app:
   theme: dark
-server:
-  port: 8080
 email:
   provider: smtp
 worker:
@@ -217,7 +210,6 @@ worker:
 		cfg, err := Load(path)
 		require.NoError(err)
 		assert.Equal("cupcake", cfg.App.Theme)
-		assert.Equal(8080, cfg.Server.Port)
 		assert.Equal("smtp", cfg.Email.Provider)
 	})
 

@@ -20,6 +20,9 @@ func newTestApp(t *testing.T, cfgYAML string) (*App, string) {
 
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "config.yaml")
+	if cfgYAML == "" {
+		cfgYAML = "app:\n  theme: dark\n  language: en\n"
+	}
 	require.NoError(t, os.WriteFile(path, []byte(cfgYAML), 0644))
 
 	cfg, err := config.Load(path)
@@ -29,7 +32,7 @@ func newTestApp(t *testing.T, cfgYAML string) (*App, string) {
 }
 
 func TestGetVersion(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	assert.Equal(t, "test-version", a.GetVersion())
 }
 
@@ -55,7 +58,7 @@ email:
 const testCSV = "name,email\nAlice,alice@example.com\nBob,bob@example.com\n"
 
 func TestPreviewText(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 
 	results, err := a.Preview(CampaignInput{
 		CSVText: testCSV,
@@ -73,7 +76,7 @@ func TestPreviewText(t *testing.T) {
 }
 
 func TestPreviewFilePath(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 
 	csvPath := filepath.Join(t.TempDir(), "recipients.csv")
 	require.NoError(t, os.WriteFile(csvPath, []byte(testCSV), 0644))
@@ -91,14 +94,14 @@ func TestPreviewFilePath(t *testing.T) {
 }
 
 func TestPreviewRequiresCSV(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	_, err := a.Preview(CampaignInput{Subject: "x"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "csv data is required")
 }
 
 func TestPreviewMissingEmailColumn(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	_, err := a.Preview(CampaignInput{
 		CSVText: "name\nAlice\n",
 		Count:   5,
@@ -108,7 +111,7 @@ func TestPreviewMissingEmailColumn(t *testing.T) {
 }
 
 func TestPreviewInvalidFilePath(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	_, err := a.Preview(CampaignInput{
 		CSVFilePath: filepath.Join(t.TempDir(), "missing.csv"),
 	})
@@ -116,14 +119,14 @@ func TestPreviewInvalidFilePath(t *testing.T) {
 }
 
 func TestStartCampaignRequiresCSV(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	err := a.StartCampaign(CampaignInput{Subject: "x"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "csv data is required")
 }
 
 func TestStartCampaignTwiceRejected(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	st := a.store
 
 	// Simulate an already running campaign.
@@ -141,13 +144,13 @@ func TestStartCampaignTwiceRejected(t *testing.T) {
 }
 
 func TestPauseResumeErrorsWhenNotRunning(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	assert.Error(t, a.PauseCampaign())
 	assert.Error(t, a.ResumeCampaign())
 }
 
 func TestResetCampaign(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	a.store.SetCSV([]store.Recipient{{Index: 0, Data: map[string]string{"name": "A"}, Email: "a@x.com"}})
 	a.store.SetTemplate(store.Template{Subject: "x"})
 	assert.NotEqual(t, store.StateIdle, a.store.GetState())
@@ -162,8 +165,6 @@ func TestSaveConfigPartial(t *testing.T) {
 app:
   theme: dark
   language: en
-server:
-  port: 8080
 `)
 	require.NoError(t, a.SaveConfig(`{"app":{"theme":"cupcake"}}`))
 
@@ -179,12 +180,12 @@ server:
 }
 
 func TestSaveConfigEmpty(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	assert.Error(t, a.SaveConfig(""))
 }
 
 func TestParseCSVFile(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	csvPath := filepath.Join(t.TempDir(), "recipients.csv")
 	require.NoError(t, os.WriteFile(csvPath, []byte(testCSV), 0644))
 
@@ -197,13 +198,13 @@ func TestParseCSVFile(t *testing.T) {
 }
 
 func TestParseCSVFileEmpty(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	_, err := a.ParseCSVFile("")
 	assert.Error(t, err)
 }
 
 func TestStartupStoresContext(t *testing.T) {
-	a, _ := newTestApp(t, "server:\n  port: 8080\n")
+	a, _ := newTestApp(t, "")
 	ctx := context.Background()
 	a.Startup(ctx)
 	assert.Equal(t, ctx, a.ctx)

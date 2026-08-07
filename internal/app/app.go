@@ -76,7 +76,6 @@ func (a *App) GetCampaignConfig() map[string]any {
 			"theme":    a.defaultConfig.App.Theme,
 			"language": a.defaultConfig.App.Language,
 		},
-		"server": a.defaultConfig.Server,
 		"email": map[string]any{
 			"provider": a.defaultConfig.Email.Provider,
 			"from":     a.defaultConfig.Email.From,

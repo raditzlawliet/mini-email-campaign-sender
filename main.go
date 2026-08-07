@@ -42,8 +42,8 @@ func main() {
 		Title:     "MECS - Mini Email Campaign Sender",
 		Width:     1280,
 		Height:    900,
-		MinWidth:  1024,
-		MinHeight: 700,
+		MinWidth:  800,
+		MinHeight: 600,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
