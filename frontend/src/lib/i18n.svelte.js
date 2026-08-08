@@ -1,8 +1,15 @@
 const translations = {
   en: {
     app_title: "Mini Email Campaign Sender",
+    window_title: "MECS - Mini Email Campaign Sender",
     language: "Language",
     change_language: "Change Language",
+    window_minimize: "Minimize",
+    window_maximize: "Maximize",
+    window_restore: "Restore",
+    window_close: "Close",
+    view_releases: "Check latest version",
+    github_repository: "Want to help out? Get involved on GitHub",
 
     input_data: "Input Data",
     manual_input: "Manual input",
@@ -118,8 +125,15 @@ const translations = {
 
   ar: {
     app_title: "Mini Email Campaign Sender",
+    window_title: "MECS - Mini Email Campaign Sender",
     language: "اللغة",
     change_language: "تغيير اللغة",
+    window_minimize: "تصغير",
+    window_maximize: "تكبير",
+    window_restore: "استعادة",
+    window_close: "إغلاق",
+    view_releases: "تحقق من أحدث إصدار",
+    github_repository: "تريد المساعدة؟ شارك على GitHub",
 
     input_data: "بيانات الإدخال",
     manual_input: "إدخال يدوي",
@@ -234,8 +248,15 @@ const translations = {
 
   id: {
     app_title: "Mini Email Campaign Sender",
+    window_title: "MECS - Mini Email Campaign Sender",
     language: "Bahasa",
     change_language: "Ganti Bahasa",
+    window_minimize: "Minimalkan",
+    window_maximize: "Maksimalkan",
+    window_restore: "Pulihkan",
+    window_close: "Tutup",
+    view_releases: "Periksa versi terbaru",
+    github_repository: "Ingin membantu? Bergabunglah di GitHub",
 
     input_data: "Data Input",
     manual_input: "Input manual",

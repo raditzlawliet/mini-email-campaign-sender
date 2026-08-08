@@ -2,3 +2,9 @@
 @plugin "daisyui" {
     themes: all;
 }
+
+/* Wails v2.13 detects draggable regions via the --wails-draggable CSS
+   custom property (inherited by children), not the attribute itself. */
+[data-wails-drag] {
+    --wails-draggable: drag;
+}
