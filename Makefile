@@ -10,9 +10,9 @@ build:
 build-windows:
 	wails build -platform windows/amd64 -nsis -ldflags "-X main.version=$(VERSION)"
 
-# Linux build (amd64)
+# Linux build (amd64) - uses webkit2_41 tag (webkit2gtk-4.1, 4.0 dropped on modern Ubuntu)
 build-linux:
-	wails build -platform linux/amd64 -ldflags "-X main.version=$(VERSION)"
+	wails build -platform linux/amd64 -tags webkit2_41 -ldflags "-X main.version=$(VERSION)"
 
 # Build both platforms
 build-all: build-windows build-linux
