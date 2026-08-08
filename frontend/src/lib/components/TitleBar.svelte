@@ -1,16 +1,34 @@
 <script>
     import { onMount } from "svelte";
-    import { ChevronDown, ChevronUp, GlobeIcon } from "@lucide/svelte";
+    import {
+        Mail,
+        Minus,
+        Square,
+        Copy,
+        X,
+        GlobeIcon,
+        ChevronDown,
+        ChevronUp,
+    } from "@lucide/svelte";
+    import {
+        WindowMinimise,
+        WindowToggleMaximise,
+        WindowIsMaximised,
+        Quit,
+        EventsOn,
+        EventsOff,
+        BrowserOpenURL,
+    } from "../wailsjs/runtime/runtime";
+    import {
+        GetVersion,
+        GetCampaignConfig,
+        SaveConfig,
+    } from "../wailsjs/go/app/App";
     import { t, setLanguage, getLanguage, LANGS } from "../i18n.svelte.js";
-    import { GetVersion, GetCampaignConfig, SaveConfig } from "../wailsjs/go/app/App";
-    import { BrowserOpenURL } from "../wailsjs/runtime/runtime";
+    import { app } from "../wailsjs/go/models";
 
-    // static for now, later will use cicd if needed
     const REPO_URL =
         "https://github.com/raditzlawliet/mini-email-campaign-sender";
-
-    // fetched from Go binding to maintain single source of truth
-    let appVersion = $state("dev");
 
     const THEMES = [
         "dark",
@@ -47,11 +65,38 @@
         "sunset",
     ];
 
+    let isMaximized = $state(false);
+    let appVersion = $state("dev");
     let currentTheme = $state("dark");
     let themeDropdownOpen = $state(false);
     let langDropdownOpen = $state(false);
     let langRef = $state(null);
     let themeRef = $state(null);
+
+    async function refreshMaximized() {
+        try {
+            isMaximized = await WindowIsMaximised();
+        } catch {
+            // runtime unavailable (plain browser dev) - keep current state
+        }
+    }
+
+    function minimize() {
+        WindowMinimise().catch(() => {});
+    }
+
+    async function toggleMaximize() {
+        try {
+            WindowToggleMaximise();
+        } catch {
+            // runtime unavailable (plain browser dev) - keep current state
+        }
+        refreshMaximized();
+    }
+
+    function closeApp() {
+        Quit().catch(() => {});
+    }
 
     function toggleLang() {
         if (langDropdownOpen) {
@@ -77,18 +122,18 @@
         if (themeRef && !path.includes(themeRef)) themeDropdownOpen = false;
     }
 
-    async function persistTheme(t) {
-        SaveConfig(JSON.stringify({ app: { theme: t } })).catch(() => {});
+    async function persistTheme(theme) {
+        SaveConfig(JSON.stringify({ app: { theme } })).catch(() => {});
     }
 
-    async function selectTheme(tm) {
-        currentTheme = tm;
-        document.documentElement.dataset.theme = tm;
+    function selectTheme(theme) {
+        currentTheme = theme;
+        document.documentElement.dataset.theme = theme;
         themeDropdownOpen = false;
-        persistTheme(tm);
+        persistTheme(theme);
     }
 
-    async function selectLanguage(code) {
+    function selectLanguage(code) {
         setLanguage(code);
         langDropdownOpen = false;
         SaveConfig(JSON.stringify({ app: { language: code } })).catch(() => {});
@@ -98,67 +143,93 @@
         BrowserOpenURL(url);
     }
 
-    onMount(async () => {
+    onMount(() => {
+        refreshMaximized();
+        EventsOn("wails:maximised", () => {
+            isMaximized = true;
+        });
+        EventsOn("wails:unmaximised", () => {
+            isMaximized = false;
+        });
         document.addEventListener("click", handleDocClick);
-        try {
-            const data = await GetCampaignConfig();
-            const t = data?.app?.theme || "dark";
-            const l = data?.app?.language || "en";
-            currentTheme = t;
-            document.documentElement.dataset.theme = currentTheme;
-            setLanguage(l);
-        } catch {
-            currentTheme = "dark";
-            setLanguage("en");
-        }
 
-        try {
-            appVersion = (await GetVersion()) || "dev";
-        } catch {
-            appVersion = "dev";
-        }
+        (async () => {
+            try {
+                const data = await GetCampaignConfig();
+                const theme = data?.app?.theme || "dark";
+                const lang = data?.app?.language || "en";
+                currentTheme = theme;
+                document.documentElement.dataset.theme = currentTheme;
+                setLanguage(lang);
+            } catch {
+                currentTheme = "dark";
+                setLanguage("en");
+            }
+            try {
+                appVersion = (await GetVersion()) || "dev";
+            } catch {
+                appVersion = "dev";
+            }
+        })();
 
-        return () => document.removeEventListener("click", handleDocClick);
+        return () => {
+            EventsOff("wails:maximised");
+            EventsOff("wails:unmaximised");
+            document.removeEventListener("click", handleDocClick);
+        };
     });
 </script>
 
-<div class="navbar bg-base-100 shadow-sm h-9">
-    <div class="navbar-start"></div>
-    <div class="navbar-center">
-        <div class="flex items-baseline gap-1">
-            <span class="font-bold text-xl">{t("app_title")}</span>
-            <button
-                onclick={() => openExternal(REPO_URL + "/releases")}
-                class="btn btn-ghost btn-xs text-xs font-mono opacity-60 hover:opacity-100"
-                title="View releases"
-            >
-                {appVersion}
-            </button>
-        </div>
+<header
+    dir="ltr"
+    class="fixed inset-x-0 top-0 z-50 flex h-8 select-none items-stretch bg-base-100 shadow-sm"
+>
+    <!-- Drag region: title + version -->
+    <div
+        data-wails-drag
+        role="button"
+        tabindex="-1"
+        ondblclick={toggleMaximize}
+        class="flex min-w-0 flex-1 cursor-default items-center px-2"
+    >
+        <Mail class="size-4 shrink-0 text-primary me-2"></Mail>
+        <span class="truncate text-sm font-bold tracking-wide"
+            >{t("window_title")}</span
+        >
+        <button
+            style="--wails-draggable: no-drag"
+            onclick={() => openExternal(REPO_URL + "/releases")}
+            class="btn btn-ghost btn-xs shrink-0 font-mono text-xs opacity-60 hover:opacity-100"
+            title={t("view_releases")}
+        >
+            {appVersion}
+        </button>
     </div>
-    <div class="navbar-end gap-0.5">
+
+    <!-- App controls + window controls -->
+    <div class="flex items-stretch">
         <!-- Language picker -->
         <div
-            class="dropdown dropdown-end"
+            class="dropdown dropdown-end dropdown-bottom"
             class:dropdown-open={langDropdownOpen}
             bind:this={langRef}
         >
             <button
-                class="btn btn-sm btn-ghost gap-1 px-1.5 text-[.5625rem] font-bold"
+                class="btn btn-ghost btn-sm gap-1 px-2 font-bold"
                 aria-label={t("change_language")}
                 title={t("change_language")}
                 onclick={toggleLang}
             >
-                <GlobeIcon class="w-4 h-4"></GlobeIcon>
+                <GlobeIcon class="size-4"></GlobeIcon>
                 {#if langDropdownOpen}
-                    <ChevronUp class="w-4 h-4" />
+                    <ChevronUp class="size-3.5" />
                 {:else}
-                    <ChevronDown class="w-4 h-4" />
+                    <ChevronDown class="size-3.5" />
                 {/if}
             </button>
             {#if langDropdownOpen}
                 <div
-                    class="dropdown-content bg-base-200 rounded-box z-1 w-56 shadow-2xl mt-1 max-h-80 overflow-y-auto"
+                    class="dropdown-content bg-base-200 rounded-box z-1 w-56 shadow-2xl max-h-80 overflow-y-auto"
                 >
                     <ul class="menu menu-sm w-full">
                         {#each LANGS as l}
@@ -186,16 +257,16 @@
 
         <!-- Theme picker -->
         <div
-            class="dropdown dropdown-end"
+            class="dropdown dropdown-end dropdown-bottom"
             class:dropdown-open={themeDropdownOpen}
             bind:this={themeRef}
         >
             <button
-                class="btn btn-ghost btn-sm gap-2 capitalize"
+                class="btn btn-ghost btn-sm gap-2 px-2 capitalize"
                 onclick={toggleTheme}
             >
                 <div
-                    class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md p-0.5 shadow-sm"
+                    class="bg-base-100 grid shrink-0 grid-cols-2 gap-0.5 rounded-md shadow-sm"
                 >
                     <div class="bg-base-content size-1 rounded-full"></div>
                     <div class="bg-primary size-1 rounded-full"></div>
@@ -203,14 +274,14 @@
                     <div class="bg-accent size-1 rounded-full"></div>
                 </div>
                 {#if themeDropdownOpen}
-                    <ChevronUp class="w-4 h-4" />
+                    <ChevronUp class="size-3.5" />
                 {:else}
-                    <ChevronDown class="w-4 h-4" />
+                    <ChevronDown class="size-3.5" />
                 {/if}
             </button>
             {#if themeDropdownOpen}
                 <div
-                    class="dropdown-content bg-base-200 rounded-box z-1 w-48 shadow-2xl mt-1 max-h-80 overflow-y-auto"
+                    class="dropdown-content bg-base-200 rounded-box z-1 w-48 shadow-2xl max-h-80 overflow-y-auto"
                 >
                     <ul class="menu menu-sm w-full">
                         {#each THEMES as tm}
@@ -250,12 +321,12 @@
         <!-- GitHub link -->
         <button
             onclick={() => openExternal(REPO_URL)}
-            class="btn btn-ghost btn-sm"
-            title="GitHub repository"
-            aria-label="GitHub repository"
+            class="btn btn-ghost btn-sm px-2"
+            title={t("github_repository")}
+            aria-label={t("github_repository")}
         >
             <svg
-                class="w-4 h-4"
+                class="size-4"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -265,5 +336,41 @@
                 />
             </svg>
         </button>
+
+        <div class="my-1.5 w-px bg-base-content/10"></div>
+
+        <!-- Window controls -->
+        <div class="flex">
+            <button
+                class="flex w-10 items-center justify-center hover:bg-base-content/10"
+                aria-label={t("window_minimize")}
+                title={t("window_minimize")}
+                onclick={minimize}
+            >
+                <Minus class="size-4"></Minus>
+            </button>
+            <button
+                class="flex w-10 items-center justify-center hover:bg-base-content/10"
+                aria-label={isMaximized
+                    ? t("window_restore")
+                    : t("window_maximize")}
+                title={isMaximized ? t("window_restore") : t("window_maximize")}
+                onclick={toggleMaximize}
+            >
+                {#if isMaximized}
+                    <Copy class="size-3.5"></Copy>
+                {:else}
+                    <Square class="size-3.5"></Square>
+                {/if}
+            </button>
+            <button
+                class="flex w-10 items-center justify-center hover:bg-error hover:text-error-content"
+                aria-label={t("window_close")}
+                title={t("window_close")}
+                onclick={closeApp}
+            >
+                <X class="size-4"></X>
+            </button>
+        </div>
     </div>
-</div>
+</header>
