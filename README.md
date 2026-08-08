@@ -114,7 +114,7 @@ log:
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation) v2.13.0 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0`)
 - [Mailpit](https://github.com/axllent/mailpit) (for email testing)
 - **Windows**: WebView2 runtime (pre-installed on Windows 11)
-- **Linux**: WebKitGTK (`libwebkit2gtk-4.1-dev`) and GTK3 dev packages
+- **Linux**: WebKitGTK (`libwebkit2gtk-4.0-dev`) and GTK3 dev packages. `libwebkit2gtk-4.1-dev` only needed when building with the `webkit2_41` tag.
 
 ### Run in development mode
 

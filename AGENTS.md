@@ -13,6 +13,7 @@ Desktop app (Wails v2) to send personalized email campaigns to 1M recipients per
 - **Config**: YAML at `~/.mecs/config.yaml` (default) or `CONFIG_PATH` env or `./config.yaml` (legacy). Sensitive fields (SMTP password, SES keys) stored in OS keyring with `_provider` metadata blocks. Partial save via `SaveConfig` binding (yaml.Node merge).
 - **Editor**: Zed with Svelte extension.
 - **Dev mode**: `wails dev` (hot-reload for Go + Vite). No HTTP server, no CORS.
+- **Linux build deps**: `libgtk-3-dev` + `libwebkit2gtk-4.0-dev` (Wails default compiles against `webkit2gtk-4.0`). `libwebkit2gtk-4.1-dev` only needed for `-tags webkit2_41` builds. Missing `webkit2gtk-4.0.pc` causes `pkg-config` failures on CI (see `.github/workflows/release.yml`).
 
 ## Rule
 
