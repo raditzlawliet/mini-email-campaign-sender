@@ -20,6 +20,7 @@ type Config struct {
 	Email  EmailConfig  `yaml:"email"`
 	Worker WorkerConfig `yaml:"worker"`
 	Log    LogConfig    `yaml:"log"`
+	MCP    MCPConfig    `yaml:"mcp"`
 }
 
 // AppConfig holds application-level settings.
@@ -86,6 +87,14 @@ type WorkerConfig struct {
 	RetryBackoffMax  time.Duration `yaml:"retry_backoff_max"`
 }
 
+// MCPConfig holds the embedded MCP server settings.
+type MCPConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Host    string `yaml:"host"`
+	Port    int    `yaml:"port"`
+	Token   string `yaml:"token"`
+}
+
 // rawWorkerConfig is used for YAML unmarshalling to handle duration strings.
 type rawWorkerConfig struct {
 	Concurrency      int    `yaml:"concurrency"`
@@ -100,6 +109,7 @@ type rawConfig struct {
 	Email  EmailConfig     `yaml:"email"`
 	Worker rawWorkerConfig `yaml:"worker"`
 	Log    LogConfig       `yaml:"log"`
+	MCP    MCPConfig       `yaml:"mcp"`
 }
 
 //go:embed config.example.yaml
@@ -118,7 +128,7 @@ var sensitiveKeyPaths = map[string]bool{
 // by full path (dot-separated), matching the struct field declarations.
 // Root uses empty string. Keys not listed appear last.
 var canonicalOrder = map[string][]string{
-	"":             {"app", "email", "worker", "log"},
+	"":             {"app", "email", "worker", "log", "mcp"},
 	"app":          {"theme", "language"},
 	"email":        {"provider", "from", "smtp", "ses"},
 	"email.smtp":   {"host", "port", "username", "password", "password_provider", "tls", "batch_size"},
@@ -126,6 +136,7 @@ var canonicalOrder = map[string][]string{
 	"worker":       {"concurrency", "max_retries", "retry_backoff_base", "retry_backoff_max"},
 	"log":          {"campaign"},
 	"log.campaign": {"log_to_file", "verbose"},
+	"mcp":          {"enabled", "host", "port", "token"},
 }
 
 // ResolveConfigPath determines the config file path.
@@ -513,6 +524,7 @@ func Load(path string) (*Config, error) {
 			RetryBackoffMax:  backoffMax,
 		},
 		Log: raw.Log,
+		MCP: raw.MCP,
 	}
 
 	// Load secrets from keyring where provider.type == "keyring".
@@ -538,6 +550,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Worker.MaxRetries == 0 {
 		cfg.Worker.MaxRetries = 3
+	}
+	if cfg.MCP.Host == "" {
+		cfg.MCP.Host = "127.0.0.1"
+	}
+	if cfg.MCP.Port == 0 {
+		cfg.MCP.Port = 18799
 	}
 
 	return cfg, nil

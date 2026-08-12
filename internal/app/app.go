@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/raditzlawliet/test-mass-email/internal/campaign"
 	"github.com/raditzlawliet/test-mass-email/internal/config"
+	"github.com/raditzlawliet/test-mass-email/internal/mcp"
 	"github.com/raditzlawliet/test-mass-email/internal/store"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -21,6 +23,9 @@ type App struct {
 	store         *store.Store
 	configPath    string
 	version       string
+
+	mcpSrv *mcp.Server
+	mcpMu  sync.Mutex
 }
 
 // NewApp creates the Wails application instance.
@@ -37,6 +42,7 @@ func NewApp(defaultCfg *config.Config, st *store.Store, configPath string, versi
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 	go a.emitProgressLoop()
+	a.reconcileMCP()
 }
 
 // emitProgressLoop pushes progress + log events to the frontend every 1s,
@@ -56,8 +62,56 @@ func (a *App) emitProgressLoop() {
 		runtime.EventsEmit(a.ctx, "campaign:progress", map[string]any{
 			"progress": a.store.GetProgress(),
 			"events":   events,
+			"revision": a.store.GetRevision(),
 		})
 	}
+}
+
+// reloadConfig reloads config.yaml into memory and reconciles the MCP server.
+func (a *App) reloadConfig() error {
+	cfg, err := config.Load(a.configPath)
+	if err != nil {
+		return fmt.Errorf("failed to reload config: %w", err)
+	}
+	a.defaultConfig = cfg
+	a.reconcileMCP()
+	return nil
+}
+
+// reconcileMCP ensures the embedded MCP server exists and matches the mcp
+// config section (start/stop/restart handled inside the server).
+func (a *App) reconcileMCP() {
+	a.mcpMu.Lock()
+	if a.mcpSrv == nil {
+		a.mcpSrv = mcp.NewServer(
+			a.store,
+			func() *config.Config { return a.defaultConfig },
+			a.configPath,
+			a.version,
+			a.reloadConfig,
+		)
+	}
+	srv := a.mcpSrv
+	a.mcpMu.Unlock()
+	srv.Reconcile()
+}
+
+// mcpRunning reports whether the MCP HTTP listener is currently active.
+func (a *App) mcpRunning() bool {
+	a.mcpMu.Lock()
+	defer a.mcpMu.Unlock()
+	return a.mcpSrv != nil && a.mcpSrv.Running()
+}
+
+// mcpStatus reports the live MCP server status: one of running/starting/
+// error/stopped, plus the actual bound address and last start error.
+func (a *App) mcpStatus() (status, addr, errMsg string) {
+	a.mcpMu.Lock()
+	defer a.mcpMu.Unlock()
+	if a.mcpSrv == nil {
+		return "stopped", "", ""
+	}
+	return a.mcpSrv.Status()
 }
 
 // GetVersion returns the application version.
@@ -70,6 +124,7 @@ func (a *App) GetCampaignConfig() map[string]any {
 	st := a.store
 	tmpl := st.GetTemplate()
 	cfg := st.GetConfig()
+	mcpStatus, mcpAddr, mcpErr := a.mcpStatus()
 
 	return map[string]any{
 		"app": map[string]any{
@@ -94,12 +149,24 @@ func (a *App) GetCampaignConfig() map[string]any {
 				"verbose":     a.defaultConfig.Log.Campaign.Verbose,
 			},
 		},
+		"mcp": map[string]any{
+			"enabled": a.defaultConfig.MCP.Enabled,
+			"host":    a.defaultConfig.MCP.Host,
+			"port":    a.defaultConfig.MCP.Port,
+			"token":   "", // redacted
+			"running": a.mcpRunning(),
+			"status":  mcpStatus,
+			"addr":    mcpAddr,
+			"error":   mcpErr,
+		},
 		"campaign": map[string]any{
 			"state":    st.GetState(),
 			"progress": st.GetProgress(),
 			"events":   st.GetEvents(),
 			"template": tmpl,
 			"config":   cfg,
+			"csv_text": st.GetCSVText(),
+			"revision": st.GetRevision(),
 		},
 	}
 }
@@ -308,12 +375,7 @@ func (a *App) SaveConfig(partialJSON string) error {
 	if err := config.SavePartial(a.configPath, []byte(partialJSON)); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
-	cfg, err := config.Load(a.configPath)
-	if err != nil {
-		return fmt.Errorf("failed to reload config: %w", err)
-	}
-	a.defaultConfig = cfg
-	return nil
+	return a.reloadConfig()
 }
 
 // PickCSVFile opens a native file dialog and returns the selected CSV path.

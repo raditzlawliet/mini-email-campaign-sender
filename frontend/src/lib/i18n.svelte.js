@@ -74,6 +74,22 @@ const translations = {
     verbose_logging_desc:
       "Include per-email send/retry debug details in log and frontend",
 
+    mcp_settings: "MCP Server",
+    mcp_enabled: "Enable MCP server",
+    mcp_enabled_desc:
+      "Allow AI agents to control campaigns via MCP on localhost",
+    mcp_host: "Host",
+    mcp_port: "Port",
+    mcp_token: "Token (optional)",
+    mcp_token_desc:
+      "If set, clients must send Authorization: Bearer <token>",
+    mcp_token_placeholder: "leave empty for no auth",
+    mcp_running: "Running",
+    mcp_stopped: "Stopped",
+    mcp_starting: "Starting...",
+    mcp_error: "Error",
+    mcp_apply: "Apply",
+
     loading_config: "Loading configuration...",
     email_provider_tab: "Email Provider",
     worker_tab: "Worker",
@@ -195,6 +211,22 @@ const translations = {
     log_to_file_desc: "كتابة أحداث الحملة إلى logs/campaign_*.log",
     verbose_logging: "تسجيل مفصّل",
     verbose_logging_desc: "تضمين تفاصيل تصحيح لكل بريد في السجل والواجهة",
+
+    mcp_settings: "خادم MCP",
+    mcp_enabled: "تفعيل خادم MCP",
+    mcp_enabled_desc:
+      "السماح لوكلاء الذكاء الاصطناعي بالتحكم في الحملات عبر MCP على localhost",
+    mcp_host: "المضيف",
+    mcp_port: "المنفذ",
+    mcp_token: "الرمز المميز (اختياري)",
+    mcp_token_desc:
+      "إذا تم تعيينه، يجب على العملاء إرسال Authorization: Bearer <token>",
+    mcp_token_placeholder: "اتركه فارغًا بدون مصادقة",
+    mcp_running: "يعمل",
+    mcp_stopped: "متوقف",
+    mcp_starting: "جارٍ التشغيل...",
+    mcp_error: "خطأ",
+    mcp_apply: "تطبيق",
 
     loading_config: "جارٍ تحميل الإعدادات...",
     email_provider_tab: "مزوّد البريد",
@@ -318,6 +350,22 @@ const translations = {
     log_to_file_desc: "Tulis event kampanye ke logs/campaign_*.log",
     verbose_logging: "Log verbose",
     verbose_logging_desc: "Sertakan detail debug per-email di log dan frontend",
+
+    mcp_settings: "Server MCP",
+    mcp_enabled: "Aktifkan server MCP",
+    mcp_enabled_desc:
+      "Izinkan agen AI mengontrol kampanye melalui MCP di localhost",
+    mcp_host: "Host",
+    mcp_port: "Port",
+    mcp_token: "Token (opsional)",
+    mcp_token_desc:
+      "Jika diisi, klien harus mengirim Authorization: Bearer <token>",
+    mcp_token_placeholder: "kosongkan untuk tanpa autentikasi",
+    mcp_running: "Berjalan",
+    mcp_stopped: "Berhenti",
+    mcp_starting: "Memulai...",
+    mcp_error: "Error",
+    mcp_apply: "Terapkan",
 
     loading_config: "Memuat konfigurasi...",
     email_provider_tab: "Penyedia Email",

@@ -46,10 +46,15 @@ func TestStore(t *testing.T) {
 		assert.Equal(1, prog.Sent)
 		assert.Equal(1, prog.Pending)
 
+		// CSV text round-trip
+		st.SetCSVText("email\nalice@example.com\n")
+		assert.Equal("email\nalice@example.com\n", st.GetCSVText())
+
 		// Reset
 		st.Reset()
 		assert.Equal(StateIdle, st.GetState())
 		assert.Empty(st.GetRecipients())
+		assert.Empty(st.GetCSVText())
 	})
 
 	t.Run("SetConfig merges overrides", func(t *testing.T) {
@@ -65,6 +70,33 @@ func TestStore(t *testing.T) {
 		cfg := st.GetConfig()
 		assert.Equal("ses", cfg.Provider)
 		assert.Equal(20, cfg.Worker.Concurrency)
+	})
+
+	t.Run("revision bumps on mutations", func(t *testing.T) {
+		assert := assert.New(t)
+
+		InitStore()
+		st := GetStore()
+		rev := st.GetRevision()
+
+		st.SetCSV([]Recipient{{Index: 0, Data: map[string]string{"email": "a@b.c"}, Email: "a@b.c"}})
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.SetCSVText("email\na@b.c\n")
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.SetTemplate(Template{Subject: "S"})
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.SetConfig(CampaignConfig{Provider: "smtp"})
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.Reset()
+		assert.Greater(st.GetRevision(), rev)
 	})
 }
 

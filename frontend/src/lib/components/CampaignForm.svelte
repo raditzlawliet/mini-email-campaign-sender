@@ -77,9 +77,7 @@
         state: "idle",
     });
     let campaignRunning = $derived(
-        progress.state === "running" ||
-            progress.state === "ready" ||
-            progress.state === "paused",
+        progress.state === "running" || progress.state === "paused",
     );
     let loading = $state(true);
     let error = $state("");
@@ -217,54 +215,122 @@
             logToFile = data.log?.campaign?.log_to_file ?? true;
             verbose = data.log?.campaign?.verbose ?? false;
 
-            // Restore campaign session on refresh
-            const camp = data.campaign;
-            if (camp && camp.state !== "idle") {
-                // Restore template
-                if (camp.template) {
-                    subject = camp.template.subject || "";
-                    body = camp.template.body || "";
-                    toField = camp.template.to || "";
-                }
-                // Restore config overrides
-                if (camp.config) {
-                    const c = camp.config;
-                    if (c.from) fromEmail = c.from;
-                    if (c.provider) provider = c.provider;
-                    if (c.smtp?.Host) smtpHost = c.smtp.Host;
-                    if (c.smtp?.Port) smtpPort = String(c.smtp.Port);
-                    if (c.smtp?.Username) smtpUsername = c.smtp.Username;
-                    if (c.smtp?.Password) smtpPassword = c.smtp.Password;
-                    if (c.smtp?.TLS !== undefined) smtpTLS = c.smtp.TLS;
-                    if (c.ses?.Region) sesRegion = c.ses.Region;
-                    if (c.ses?.AccessKeyID) sesAccessKeyId = c.ses.AccessKeyID;
-                    if (c.ses?.SecretAccessKey)
-                        sesSecretAccessKey = c.ses.SecretAccessKey;
-                    if (c.ses?.UseTemplate !== undefined)
-                        sesUseTemplate = c.ses.UseTemplate;
-                    if (c.ses?.TemplateName)
-                        sesTemplateName = c.ses.TemplateName;
-                    if (c.ses?.BatchSize) sesBatchSize = c.ses.BatchSize;
-                    if (c.worker?.Concurrency)
-                        concurrency = c.worker.Concurrency;
-                    if (c.worker?.MaxRetries) maxRetries = c.worker.MaxRetries;
-                    if (c.smtp_batch_size) smtpBatchSize = c.smtp_batch_size;
-                    if (c.log_to_file !== undefined) logToFile = c.log_to_file;
-                    if (c.verbose !== undefined) verbose = c.verbose;
-                }
-                // Restore progress and log
-                progress = camp.progress || progress;
-                logEvents = camp.events || [];
-                logOpen =
-                    camp.state === "running" ||
-                    camp.state === "paused" ||
-                    camp.state === "completed";
-            }
+            // Restore campaign session on refresh (and on MCP changes)
+            syncFromStore(data.campaign);
+            lastRevision = data.campaign?.revision ?? -1;
         } catch (e) {
             error = t("load_config_failed") + " " + e.message;
         } finally {
             loading = false;
         }
+    }
+
+    // Applies the backend campaign snapshot (template, config, CSV) to the
+    // form. Used on session restore and whenever MCP stages a campaign.
+    let lastRevision = $state(-1);
+    let lastAppliedState = $state(null);
+    const MAX_CSV_TEXT = 100000; // chars; larger CSV is too heavy for a textarea
+
+    // syncFromStore mirrors backend campaign state into the form. Idle with a
+    // prior staged state means the store was cleared (MCP clear / reset), so
+    // the form resets too. Config-only updates (e.g. smtp_batch_size via MCP)
+    // still apply while idle.
+    function syncFromStore(camp) {
+        if (!camp) return;
+        if (camp.state === "idle") {
+            if (!isConfigEmpty(camp.config)) {
+                applyConfig(camp.config);
+            }
+            if (lastAppliedState && lastAppliedState !== "idle") {
+                subject = "";
+                body = "";
+                toField = "";
+                csvText = "";
+                csvCount = 0;
+                manualMode = false;
+                logEvents = [];
+            }
+            lastAppliedState = "idle";
+            return;
+        }
+        lastAppliedState = camp.state;
+        applyCampaign(camp);
+    }
+
+    function isConfigEmpty(c) {
+        return !c || (
+            !c.from &&
+            !c.provider &&
+            !c.smtp?.Host &&
+            !c.smtp?.Port &&
+            !c.smtp?.Username &&
+            !c.smtp?.Password &&
+            !c.smtp?.BatchSize &&
+            !c.smtp?.TLS &&
+            !c.ses?.Region &&
+            !c.ses?.AccessKeyID &&
+            !c.ses?.SecretAccessKey &&
+            !c.ses?.TemplateName &&
+            !c.ses?.BatchSize &&
+            !c.ses?.UseTemplate &&
+            !c.worker?.Concurrency &&
+            !c.worker?.MaxRetries &&
+            !c.smtp_batch_size &&
+            !c.log_to_file &&
+            !c.verbose
+        );
+    }
+
+    function applyConfig(c) {
+        if (!c) return;
+        if (c.from) fromEmail = c.from;
+        if (c.provider) provider = c.provider;
+        if (c.smtp?.Host) smtpHost = c.smtp.Host;
+        if (c.smtp?.Port) smtpPort = String(c.smtp.Port);
+        if (c.smtp?.Username) smtpUsername = c.smtp.Username;
+        if (c.smtp?.Password) smtpPassword = c.smtp.Password;
+        if (c.smtp?.TLS !== undefined) smtpTLS = c.smtp.TLS;
+        if (c.smtp?.BatchSize) smtpBatchSize = c.smtp.BatchSize;
+        if (c.ses?.Region) sesRegion = c.ses.Region;
+        if (c.ses?.AccessKeyID) sesAccessKeyId = c.ses.AccessKeyID;
+        if (c.ses?.SecretAccessKey)
+            sesSecretAccessKey = c.ses.SecretAccessKey;
+        if (c.ses?.UseTemplate !== undefined)
+            sesUseTemplate = c.ses.UseTemplate;
+        if (c.ses?.TemplateName) sesTemplateName = c.ses.TemplateName;
+        if (c.ses?.BatchSize) sesBatchSize = c.ses.BatchSize;
+        if (c.worker?.Concurrency) concurrency = c.worker.Concurrency;
+        if (c.worker?.MaxRetries) maxRetries = c.worker.MaxRetries;
+        if (c.smtp_batch_size) smtpBatchSize = c.smtp_batch_size;
+        if (c.log_to_file !== undefined) logToFile = c.log_to_file;
+        if (c.verbose !== undefined) verbose = c.verbose;
+    }
+
+    function applyCampaign(camp) {
+        if (!camp) return;
+        // Template
+        if (camp.template) {
+            subject = camp.template.subject || "";
+            body = camp.template.body || "";
+            toField = camp.template.to || "";
+        }
+        // Config overrides
+        applyConfig(camp.config);
+        // CSV prepared via MCP shows in manual mode
+        if (camp.csv_text) {
+            manualMode = true;
+            if (camp.csv_text.length <= MAX_CSV_TEXT) {
+                csvText = camp.csv_text;
+            }
+            csvCount = camp.progress?.total || 0;
+        }
+        // Progress + log
+        progress = camp.progress || progress;
+        if (camp.events) logEvents = camp.events;
+        logOpen =
+            camp.state === "running" ||
+            camp.state === "paused" ||
+            camp.state === "completed";
     }
 
     $effect(() => {
@@ -322,6 +388,17 @@
         EventsOn("campaign:progress", (data) => {
             if (data && data.progress) progress = data.progress;
             if (data && data.events) logEvents = data.events;
+            // Campaign staged via MCP (or cleared) - mirror it into the form.
+            if (
+                data &&
+                data.revision !== undefined &&
+                data.revision !== lastRevision
+            ) {
+                lastRevision = data.revision;
+                GetCampaignConfig()
+                    .then((cfg) => syncFromStore(cfg.campaign))
+                    .catch(() => {});
+            }
         });
     });
 

@@ -42,3 +42,9 @@ log:
   campaign:
     log_to_file: true # write campaign events to logs/campaign_*.log
     verbose: false # include debug-level detail (per-email send/retry)
+
+mcp:
+  enabled: true # embedded MCP server for AI agents (localhost only)
+  host: "127.0.0.1"
+  port: 18799
+  token: "" # optional bearer token; empty = no auth
