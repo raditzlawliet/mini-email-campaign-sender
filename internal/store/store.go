@@ -144,6 +144,34 @@ func (s *Store) GetRevision() int {
 	return s.revision
 }
 
+// StageCampaign atomically stages a prepared campaign (recipients, CSV text,
+// template, config) under one lock with a single revision bump, so readers
+// never observe a partially staged campaign. Nil values keep the current
+// value; recipients non-nil also (re)initializes statuses and moves state to
+// ready.
+func (s *Store) StageCampaign(recipients *[]Recipient, csvText *string, template *Template, config *CampaignConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if recipients != nil {
+		s.recipients = *recipients
+		s.statuses = make([]RecipientStatus, len(*recipients))
+		for i := range s.statuses {
+			s.statuses[i] = RecipientStatus{Status: "pending"}
+		}
+		s.state = StateReady
+	}
+	if csvText != nil {
+		s.csvText = *csvText
+	}
+	if template != nil {
+		s.template = *template
+	}
+	if config != nil {
+		s.config = *config
+	}
+	s.revision++
+}
+
 // SetTemplate stores the email template.
 func (s *Store) SetTemplate(t Template) {
 	s.mu.Lock()

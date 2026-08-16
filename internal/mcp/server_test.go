@@ -278,6 +278,25 @@ func TestSetConfig(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(err.Error(), "partial_json")
 	})
+
+	t.Run("rejects non-loopback mcp host", func(t *testing.T) {
+		assert := assert.New(t)
+		s, _ := newTestServer(t)
+
+		_, _, err := s.SetConfig(context.Background(), &mcp.CallToolRequest{}, SetConfigParams{
+			PartialJSON: `{"mcp":{"host":"0.0.0.0"}}`,
+		})
+		require.Error(t, err)
+		assert.Contains(err.Error(), "loopback")
+
+		// Loopback host changes pass the guard (then fail on the missing
+		// config file - which is fine, it proves the host check let it through).
+		_, _, err = s.SetConfig(context.Background(), &mcp.CallToolRequest{}, SetConfigParams{
+			PartialJSON: `{"mcp":{"host":"127.0.0.1"}}`,
+		})
+		require.Error(t, err)
+		assert.NotContains(err.Error(), "loopback")
+	})
 }
 
 func TestDryRunCampaign(t *testing.T) {
@@ -353,7 +372,7 @@ func TestPauseResumeClear(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("pause then resume transitions state", func(t *testing.T) {
+	t.Run("double pause is rejected", func(t *testing.T) {
 		assert := assert.New(t)
 		s, st := newTestServer(t)
 		st.SetCSV([]store.Recipient{{Index: 0, Data: map[string]string{"email": "a@b.c"}, Email: "a@b.c"}})
@@ -363,7 +382,7 @@ func TestPauseResumeClear(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(text(t, res), `"state": "paused"`)
 
-		// Resume would spawn a worker pool - only verify the guard errors.
+		// Pausing an already-paused campaign is rejected.
 		_, _, err = s.PauseCampaign(context.Background(), &mcp.CallToolRequest{}, struct{}{})
 		require.Error(t, err)
 	})
@@ -624,6 +643,13 @@ func TestCampaignWorkflowOverHTTP(t *testing.T) {
 	require.NoError(t, s.Start())
 	defer s.Stop()
 
+	// Reserve an ephemeral loopback port with no listener (sends will fail
+	// fast with connection refused, like TestServerStatus).
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	smtpPort := ln.Addr().(*net.TCPAddr).Port
+	require.NoError(t, ln.Close())
+
 	base := "http://" + s.ListenAddr() + "/mcp"
 	t.Logf("connected to MCP server at %s/mcp", s.ListenAddr())
 
@@ -642,7 +668,8 @@ func TestCampaignWorkflowOverHTTP(t *testing.T) {
 		"to":                 "{email}",
 		"from":               "ai@example.com",
 		"provider":           "smtp",
-		"smtp_host":          "localhost",
+		"smtp_host":          "127.0.0.1",
+		"smtp_port":          smtpPort,
 		"max_retries":        1,
 		"retry_backoff_base": "50ms",
 		"retry_backoff_max":  "200ms",
@@ -668,7 +695,7 @@ func TestCampaignWorkflowOverHTTP(t *testing.T) {
 	t.Logf("start_campaign -> %s", txt)
 	assert.Contains(t, txt, `"status": "started"`)
 
-	// 6. campaign completes (sends fail: no SMTP server on localhost:1025)
+	// 6. campaign completes (sends fail: no SMTP server on the reserved port)
 	require.Eventually(t, func() bool {
 		return strings.Contains(
 			callText(t, base, 11, 12, "mecs_get_current_campaign", map[string]any{}),

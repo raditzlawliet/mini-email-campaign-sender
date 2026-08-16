@@ -81,6 +81,7 @@ const translations = {
     mcp_host: "Host",
     mcp_port: "Port",
     mcp_token: "Token (optional)",
+    mcp_clear_token: "Clear",
     mcp_token_desc:
       "If set, clients must send Authorization: Bearer <token>",
     mcp_token_placeholder: "leave empty for no auth",
@@ -103,6 +104,8 @@ const translations = {
     start_campaign: "Start Campaign",
     reset: "Reset",
     provide_csv: "Provide CSV data to enable Preview and Start.",
+    csv_too_large:
+      "Staged CSV is too large to display in the editor. It is kept in memory - start from the AI/MCP side or use a smaller CSV here.",
     progress: "Progress",
     running: "Running",
     paused: "Paused",
@@ -219,6 +222,7 @@ const translations = {
     mcp_host: "المضيف",
     mcp_port: "المنفذ",
     mcp_token: "الرمز المميز (اختياري)",
+    mcp_clear_token: "مسح",
     mcp_token_desc:
       "إذا تم تعيينه، يجب على العملاء إرسال Authorization: Bearer <token>",
     mcp_token_placeholder: "اتركه فارغًا بدون مصادقة",
@@ -240,7 +244,9 @@ const translations = {
     resume: "استئناف",
     start_campaign: "بدء الحملة",
     reset: "إعادة تعيين",
-    provide_csv: "قدّم بيانات CSV لتفعيل المعاينة والبدء.",
+    provide_csv: "وفّر بيانات CSV لتفعيل المعاينة والبدء.",
+    csv_too_large:
+      "ملف CSV المُعد كبير جدًا للعرض في المحرر. يُحتفظ به في الذاكرة - ابدأ من جانب الذكاء الاصطناعي/MCP أو استخدم CSV أصغر هنا.",
     progress: "التقدّم",
     running: "قيد التشغيل",
     paused: "متوقف مؤقتاً",
@@ -358,6 +364,7 @@ const translations = {
     mcp_host: "Host",
     mcp_port: "Port",
     mcp_token: "Token (opsional)",
+    mcp_clear_token: "Hapus",
     mcp_token_desc:
       "Jika diisi, klien harus mengirim Authorization: Bearer <token>",
     mcp_token_placeholder: "kosongkan untuk tanpa autentikasi",
@@ -380,6 +387,8 @@ const translations = {
     start_campaign: "Mulai Kampanye",
     reset: "Reset",
     provide_csv: "Sediakan data CSV untuk mengaktifkan Pratinjau dan Mulai.",
+    csv_too_large:
+      "CSV yang disiapkan terlalu besar untuk ditampilkan di editor. Disimpan di memori - mulai dari sisi AI/MCP atau gunakan CSV yang lebih kecil di sini.",
     progress: "Progress",
     running: "Berjalan",
     paused: "Dijeda",

@@ -142,14 +142,16 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 		csvText = string(data)
 	}
 
+	var newRecipients *[]store.Recipient
+	var newCSV *string
 	recipientCount := -1
 	if csvText != "" {
 		recipients, err := campaign.ParseCSV(csvText)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid CSV: %w", err)
 		}
-		s.store.SetCSV(recipients)
-		s.store.SetCSVText(csvText)
+		newRecipients = &recipients
+		newCSV = &csvText
 		recipientCount = len(recipients)
 	}
 
@@ -164,7 +166,6 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 	if args.To != "" {
 		tmpl.To = args.To
 	}
-	s.store.SetTemplate(tmpl)
 
 	// Merge campaign config.
 	cfg := s.store.GetConfig()
@@ -218,10 +219,18 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 		cfg.Worker.MaxRetries = args.MaxRetries
 	}
 	if args.BackoffBase != "" {
-		cfg.Worker.RetryBackoffBase = parseDurationOrZero(args.BackoffBase)
+		d, err := time.ParseDuration(args.BackoffBase)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid retry_backoff_base %q: %w", args.BackoffBase, err)
+		}
+		cfg.Worker.RetryBackoffBase = d
 	}
 	if args.BackoffMax != "" {
-		cfg.Worker.RetryBackoffMax = parseDurationOrZero(args.BackoffMax)
+		d, err := time.ParseDuration(args.BackoffMax)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid retry_backoff_max %q: %w", args.BackoffMax, err)
+		}
+		cfg.Worker.RetryBackoffMax = d
 	}
 	if args.LogToFile != nil {
 		cfg.LogToFile = *args.LogToFile
@@ -229,7 +238,7 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 	if args.Verbose != nil {
 		cfg.Verbose = *args.Verbose
 	}
-	s.store.SetConfig(cfg)
+	s.store.StageCampaign(newRecipients, newCSV, &tmpl, &cfg)
 
 	s.store.LogAndEvent("info", "Campaign prepared via MCP")
 	return resultJSON(map[string]any{
@@ -266,6 +275,13 @@ func (s *Server) SetConfig(ctx context.Context, req *mcp.CallToolRequest, args S
 	if strings.TrimSpace(args.PartialJSON) == "" {
 		return nil, nil, errors.New("partial_json is required: pass a JSON object with the config keys to change, e.g. {\"mcp\":{\"port\":19000}}")
 	}
+
+	// Security guard: the agent must not move MCP off loopback, which would
+	// expose campaign controls to the network.
+	if err := rejectNonLoopbackMCPHost(args.PartialJSON); err != nil {
+		return nil, nil, err
+	}
+
 	if err := config.SavePartial(s.configPath, []byte(args.PartialJSON)); err != nil {
 		return nil, nil, fmt.Errorf("failed to save config: %w", err)
 	}
@@ -275,6 +291,27 @@ func (s *Server) SetConfig(ctx context.Context, req *mcp.CallToolRequest, args S
 		}
 	}
 	return resultJSON(map[string]any{"status": "saved"}), nil, nil
+}
+
+// rejectNonLoopbackMCPHost rejects partial configs that set mcp.host to a
+// non-loopback address.
+func rejectNonLoopbackMCPHost(partialJSON string) error {
+	var partial map[string]any
+	if err := json.Unmarshal([]byte(partialJSON), &partial); err != nil {
+		return nil // let SavePartial surface the parse error
+	}
+	mcpSection, ok := partial["mcp"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	host, ok := mcpSection["host"].(string)
+	if !ok || host == "" {
+		return nil
+	}
+	if !isLoopbackHost(host) {
+		return fmt.Errorf("mcp.host %q is not allowed: only loopback addresses (127.0.0.1, localhost, ::1) can be configured via this tool", host)
+	}
+	return nil
 }
 
 func (s *Server) GetConfig(ctx context.Context, req *mcp.CallToolRequest, args GetConfigParams) (*mcp.CallToolResult, any, error) {
@@ -591,7 +628,8 @@ func durationString(d time.Duration) string {
 	return d.String()
 }
 
-func parseDurationOrZero(s string) time.Duration {
-	d, _ := time.ParseDuration(s)
-	return d
+// isLoopbackHost reports whether host is a loopback address/hostname.
+func isLoopbackHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	return h == "localhost" || h == "127.0.0.1" || h == "::1" || strings.HasPrefix(h, "127.")
 }

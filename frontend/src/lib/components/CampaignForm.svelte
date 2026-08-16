@@ -217,7 +217,9 @@
 
             // Restore campaign session on refresh (and on MCP changes)
             syncFromStore(data.campaign);
-            lastRevision = data.campaign?.revision ?? -1;
+            const campRev = data.campaign?.revision ?? -1;
+            lastSeenRevision = campRev;
+            lastAppliedRevision = campRev;
         } catch (e) {
             error = t("load_config_failed") + " " + e.message;
         } finally {
@@ -227,8 +229,10 @@
 
     // Applies the backend campaign snapshot (template, config, CSV) to the
     // form. Used on session restore and whenever MCP stages a campaign.
-    let lastRevision = $state(-1);
+    let lastSeenRevision = $state(-1);
+    let lastAppliedRevision = $state(-1);
     let lastAppliedState = $state(null);
+    let csvTooLarge = $state(false);
     const MAX_CSV_TEXT = 100000; // chars; larger CSV is too heavy for a textarea
 
     // syncFromStore mirrors backend campaign state into the form. Idle with a
@@ -248,6 +252,7 @@
                 csvText = "";
                 csvCount = 0;
                 manualMode = false;
+                csvTooLarge = false;
                 logEvents = [];
             }
             lastAppliedState = "idle";
@@ -319,10 +324,16 @@
         // CSV prepared via MCP shows in manual mode
         if (camp.csv_text) {
             manualMode = true;
+            csvCount = camp.progress?.total || 0;
             if (camp.csv_text.length <= MAX_CSV_TEXT) {
                 csvText = camp.csv_text;
+                csvTooLarge = false;
+            } else {
+                // Too large for the editor: keep the staged data in the store,
+                // but never submit a stale csvText from a previous sync.
+                csvText = "";
+                csvTooLarge = true;
             }
-            csvCount = camp.progress?.total || 0;
         }
         // Progress + log
         progress = camp.progress || progress;
@@ -392,17 +403,33 @@
             if (
                 data &&
                 data.revision !== undefined &&
-                data.revision !== lastRevision
+                data.revision !== lastSeenRevision
             ) {
-                lastRevision = data.revision;
+                const target = data.revision;
+                const prev = lastSeenRevision;
+                lastSeenRevision = target;
                 GetCampaignConfig()
-                    .then((cfg) => syncFromStore(cfg.campaign))
-                    .catch(() => {});
+                    .then((cfg) => {
+                        const campRev = cfg.campaign?.revision ?? target;
+                        // Ignore stale snapshots arriving out of order.
+                        if (campRev < lastAppliedRevision) return;
+                        syncFromStore(cfg.campaign);
+                        lastAppliedRevision = campRev;
+                    })
+                    .catch(() => {
+                        // Keep the seen mark at the previous value so the next
+                        // tick retries instead of suppressing the sync.
+                        lastSeenRevision = prev;
+                    });
             }
         });
     });
 
     async function handleStart() {
+        if (csvTooLarge) {
+            error = t("csv_too_large");
+            return;
+        }
         if (!manualMode && !csvFilePath) {
             error = t("please_provide_csv");
             return;
@@ -640,6 +667,11 @@
         </div>
 
         <!-- Actions -->
+        {#if csvTooLarge}
+            <div class="alert alert-warning text-sm">
+                {t("csv_too_large")}
+            </div>
+        {/if}
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <div class="flex flex-wrap gap-3">

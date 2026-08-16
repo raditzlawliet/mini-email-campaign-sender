@@ -6,10 +6,12 @@ package mcp
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -35,6 +37,10 @@ type Server struct {
 	actualAddr string
 	lastErr    string
 	mu         sync.Mutex
+
+	// lifecycleBusy coalesces overlapping reconciliation/restart work so a
+	// second listener is never started by concurrent Reconcile calls.
+	lifecycleBusy bool
 }
 
 // NewServer creates the MCP server and registers all tools.
@@ -60,9 +66,25 @@ func (s *Server) Running() bool {
 }
 
 // Reconcile starts, stops, or restarts the HTTP listener to match the current
-// mcp config section. Safe to call on every config change.
+// mcp config section. Safe to call on every config change. Concurrent calls
+// coalesce: while a reconciliation (or async restart) is in progress, later
+// calls are dropped - the running one already matches the latest config it saw.
 func (s *Server) Reconcile() {
 	cfg := s.cfgProvider()
+
+	s.mu.Lock()
+	if s.lifecycleBusy {
+		s.mu.Unlock()
+		return
+	}
+	s.lifecycleBusy = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.lifecycleBusy = false
+		s.mu.Unlock()
+	}()
+
 	if !cfg.MCP.Enabled {
 		s.stopAsync()
 		return
@@ -106,6 +128,10 @@ func (s *Server) Start() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+		if !isLocalOrigin(r) {
+			http.Error(w, "forbidden: non-local origin", http.StatusForbidden)
+			return
+		}
 		if cfg.MCP.Token != "" && !authorized(r, cfg.MCP.Token) {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -114,6 +140,15 @@ func (s *Server) Start() error {
 		mcpHandler.ServeHTTP(w, r)
 	})
 	mux.HandleFunc("/mcp/health", func(w http.ResponseWriter, r *http.Request) {
+		if !isLocalOrigin(r) {
+			http.Error(w, "forbidden: non-local origin", http.StatusForbidden)
+			return
+		}
+		if cfg.MCP.Token != "" && !authorized(r, cfg.MCP.Token) {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"status":"ok","campaign_state":%q}`, s.store.GetState())
 	})
@@ -121,12 +156,14 @@ func (s *Server) Start() error {
 	srv := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
+	actualAddr := ln.Addr().String()
 	s.mu.Lock()
 	s.httpServer = srv
 	s.startedCfg = cfg.MCP
-	s.actualAddr = ln.Addr().String()
+	s.actualAddr = actualAddr
 	s.lastErr = ""
 	s.mu.Unlock()
 
@@ -136,7 +173,7 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	slog.Info("MCP server started", "addr", s.actualAddr)
+	slog.Info("MCP server started", "addr", actualAddr)
 	return nil
 }
 
@@ -195,12 +232,25 @@ func (s *Server) stopAsync() {
 }
 
 // restartAsync restarts the listener with current settings. Also used from
-// inside request handlers, hence async.
+// inside request handlers, hence async. Overlapping calls coalesce via the
+// lifecycleBusy guard.
 func (s *Server) restartAsync() {
 	if !s.Running() {
 		return
 	}
 	go func() {
+		s.mu.Lock()
+		if s.lifecycleBusy {
+			s.mu.Unlock()
+			return
+		}
+		s.lifecycleBusy = true
+		s.mu.Unlock()
+		defer func() {
+			s.mu.Lock()
+			s.lifecycleBusy = false
+			s.mu.Unlock()
+		}()
 		s.Stop()
 		if err := s.Start(); err != nil {
 			slog.Error("failed to restart MCP server", "error", err)
@@ -209,7 +259,25 @@ func (s *Server) restartAsync() {
 }
 
 func authorized(r *http.Request, token string) bool {
-	return r.Header.Get("Authorization") == "Bearer "+token
+	h := r.Header.Get("Authorization")
+	want := "Bearer " + token
+	return len(h) == len(want) && subtle.ConstantTimeCompare([]byte(h), []byte(want)) == 1
+}
+
+// isLocalOrigin rejects browser-origin requests that do not originate from the
+// local machine (defense against malicious web pages targeting the localhost
+// endpoint). MCP clients that are not browsers send no Origin header.
+func isLocalOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 // boolPtr returns a pointer to v for *bool annotation fields.

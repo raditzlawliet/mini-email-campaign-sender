@@ -47,4 +47,4 @@ mcp:
   enabled: true # embedded MCP server for AI agents (localhost only)
   host: "127.0.0.1"
   port: 18799
-  token: "" # optional bearer token; empty = no auth
+  token: "" # recommended: set a bearer token to secure the endpoint (empty = no auth)

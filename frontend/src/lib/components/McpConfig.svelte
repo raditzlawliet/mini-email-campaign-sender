@@ -10,6 +10,7 @@
         addr = "",
         errorMsg = "",
         onsave = () => {},
+        oncleartoken = () => {},
     } = $props();
 </script>
 
@@ -53,13 +54,23 @@
 
         <fieldset class="fieldset">
             <label class="label" for="mcp-token">{t("mcp_token")}</label>
-            <input
-                id="mcp-token"
-                class="input w-full"
-                type="password"
-                bind:value={token}
-                placeholder={t("mcp_token_placeholder")}
-            />
+            <div class="flex gap-2">
+                <input
+                    id="mcp-token"
+                    class="input w-full"
+                    type="password"
+                    bind:value={token}
+                    placeholder={t("mcp_token_placeholder")}
+                />
+                <button
+                    class="btn btn-outline btn-sm"
+                    type="button"
+                    title={t("mcp_clear_token")}
+                    onclick={oncleartoken}
+                >
+                    {t("mcp_clear_token")}
+                </button>
+            </div>
             <p class="fieldset-label text-xs">{t("mcp_token_desc")}</p>
         </fieldset>
 

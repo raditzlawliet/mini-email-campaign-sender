@@ -253,12 +253,13 @@ Add a local MCP server entry pointing at MECS (run MECS first):
 {
   "mcpServers": {
     "mecs": {
-      "url": "http://127.0.0.1:18799/mcp",
-      "headers": {} // add { "Authorization": "Bearer <token>" } if a token is configured
+      "url": "http://127.0.0.1:18799/mcp"
     }
   }
 }
 ```
+
+If a token is configured, add `"headers": { "Authorization": "Bearer <token>" }` to the `mecs` entry.
 
 ### Security notes
 

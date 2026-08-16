@@ -151,15 +151,19 @@
 
     async function saveMcp() {
         const portNum = parseInt(mcpPort) || 18799;
-        const payload = {
-            mcp: {
-                enabled: mcpEnabled,
-                host: mcpHost.trim() || "127.0.0.1",
-                port: portNum,
-                token: mcpToken.trim() || "",
-            },
+        const mcp = {
+            enabled: mcpEnabled,
+            host: mcpHost.trim() || "127.0.0.1",
+            port: portNum,
         };
-        await SaveConfig(JSON.stringify(payload)).catch(() => {});
+        // token is redacted on load; only send it when the user typed a new one
+        if (mcpToken.trim()) mcp.token = mcpToken.trim();
+        await SaveConfig(JSON.stringify({ mcp })).catch(() => {});
+        refreshMcpStatus();
+    }
+
+    async function clearMcpToken() {
+        await SaveConfig(JSON.stringify({ mcp: { token: "" } })).catch(() => {});
         refreshMcpStatus();
     }
 
@@ -422,6 +426,7 @@
                             addr={mcpAddr}
                             errorMsg={mcpError}
                             onsave={saveMcp}
+                            oncleartoken={clearMcpToken}
                         />
                     </div>
                 </div>

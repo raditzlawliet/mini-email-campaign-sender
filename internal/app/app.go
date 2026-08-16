@@ -20,6 +20,7 @@ import (
 type App struct {
 	ctx           context.Context
 	defaultConfig *config.Config
+	cfgMu         sync.RWMutex
 	store         *store.Store
 	configPath    string
 	version       string
@@ -73,9 +74,18 @@ func (a *App) reloadConfig() error {
 	if err != nil {
 		return fmt.Errorf("failed to reload config: %w", err)
 	}
+	a.cfgMu.Lock()
 	a.defaultConfig = cfg
+	a.cfgMu.Unlock()
 	a.reconcileMCP()
 	return nil
+}
+
+// currentConfig returns the current global config under a read lock.
+func (a *App) currentConfig() *config.Config {
+	a.cfgMu.RLock()
+	defer a.cfgMu.RUnlock()
+	return a.defaultConfig
 }
 
 // reconcileMCP ensures the embedded MCP server exists and matches the mcp
@@ -85,7 +95,7 @@ func (a *App) reconcileMCP() {
 	if a.mcpSrv == nil {
 		a.mcpSrv = mcp.NewServer(
 			a.store,
-			func() *config.Config { return a.defaultConfig },
+			func() *config.Config { return a.currentConfig() },
 			a.configPath,
 			a.version,
 			a.reloadConfig,
@@ -125,34 +135,35 @@ func (a *App) GetCampaignConfig() map[string]any {
 	tmpl := st.GetTemplate()
 	cfg := st.GetConfig()
 	mcpStatus, mcpAddr, mcpErr := a.mcpStatus()
+	dflt := a.currentConfig()
 
 	return map[string]any{
 		"app": map[string]any{
-			"theme":    a.defaultConfig.App.Theme,
-			"language": a.defaultConfig.App.Language,
+			"theme":    dflt.App.Theme,
+			"language": dflt.App.Language,
 		},
 		"email": map[string]any{
-			"provider": a.defaultConfig.Email.Provider,
-			"from":     a.defaultConfig.Email.From,
-			"smtp":     a.defaultConfig.Email.SMTP,
-			"ses":      a.defaultConfig.Email.SES,
+			"provider": dflt.Email.Provider,
+			"from":     dflt.Email.From,
+			"smtp":     dflt.Email.SMTP,
+			"ses":      dflt.Email.SES,
 		},
 		"worker": map[string]any{
-			"concurrency":        a.defaultConfig.Worker.Concurrency,
-			"max_retries":        a.defaultConfig.Worker.MaxRetries,
-			"retry_backoff_base": a.defaultConfig.Worker.RetryBackoffBase.String(),
-			"retry_backoff_max":  a.defaultConfig.Worker.RetryBackoffMax.String(),
+			"concurrency":        dflt.Worker.Concurrency,
+			"max_retries":        dflt.Worker.MaxRetries,
+			"retry_backoff_base": dflt.Worker.RetryBackoffBase.String(),
+			"retry_backoff_max":  dflt.Worker.RetryBackoffMax.String(),
 		},
 		"log": map[string]any{
 			"campaign": map[string]any{
-				"log_to_file": a.defaultConfig.Log.Campaign.LogToFile,
-				"verbose":     a.defaultConfig.Log.Campaign.Verbose,
+				"log_to_file": dflt.Log.Campaign.LogToFile,
+				"verbose":     dflt.Log.Campaign.Verbose,
 			},
 		},
 		"mcp": map[string]any{
-			"enabled": a.defaultConfig.MCP.Enabled,
-			"host":    a.defaultConfig.MCP.Host,
-			"port":    a.defaultConfig.MCP.Port,
+			"enabled": dflt.MCP.Enabled,
+			"host":    dflt.MCP.Host,
+			"port":    dflt.MCP.Port,
 			"token":   "", // redacted
 			"running": a.mcpRunning(),
 			"status":  mcpStatus,
@@ -283,7 +294,8 @@ func (a *App) StartCampaign(in CampaignInput) error {
 		return fmt.Errorf("campaign is already running")
 	}
 
-	logCfg := a.defaultConfig.Log.Campaign
+	dflt := a.currentConfig()
+	logCfg := dflt.Log.Campaign
 	if in.LogToFile {
 		logCfg.LogToFile = true
 	}
@@ -298,7 +310,7 @@ func (a *App) StartCampaign(in CampaignInput) error {
 	}
 
 	ctx := context.Background()
-	if err := campaign.StartCampaign(ctx, a.defaultConfig, a.store, buildRequest(in, csv), logger); err != nil {
+	if err := campaign.StartCampaign(ctx, dflt, a.store, buildRequest(in, csv), logger); err != nil {
 		return err
 	}
 	return nil
@@ -322,6 +334,7 @@ func (a *App) ResumeCampaign() error {
 	ctx := context.Background()
 	tmpl := a.store.GetTemplate()
 	cfg := a.store.GetConfig()
+	dflt := a.currentConfig()
 
 	req := campaign.CampaignRequest{
 		Subject:       tmpl.Subject,
@@ -342,7 +355,7 @@ func (a *App) ResumeCampaign() error {
 		req.BackoffMax = cfg.Worker.RetryBackoffMax.String()
 	}
 
-	logCfg := a.defaultConfig.Log.Campaign
+	logCfg := dflt.Log.Campaign
 	if cfg.LogToFile {
 		logCfg.LogToFile = true
 	}
@@ -355,7 +368,7 @@ func (a *App) ResumeCampaign() error {
 	if err != nil {
 		return fmt.Errorf("failed to create campaign logger: %w", err)
 	}
-	if err := campaign.ResumeCampaign(ctx, a.defaultConfig, a.store, req, logger); err != nil {
+	if err := campaign.ResumeCampaign(ctx, dflt, a.store, req, logger); err != nil {
 		return err
 	}
 	return nil

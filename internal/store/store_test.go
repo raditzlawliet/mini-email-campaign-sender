@@ -98,6 +98,35 @@ func TestStore(t *testing.T) {
 		st.Reset()
 		assert.Greater(st.GetRevision(), rev)
 	})
+
+	t.Run("StageCampaign stages atomically with one revision", func(t *testing.T) {
+		assert := assert.New(t)
+
+		InitStore()
+		st := GetStore()
+		st.Reset()
+		rev := st.GetRevision()
+
+		recipients := []Recipient{{Index: 0, Data: map[string]string{"email": "a@b.c"}, Email: "a@b.c"}}
+		csvText := "email\na@b.c\n"
+		tmpl := Template{Subject: "S", Body: "B", To: "T"}
+		cfg := CampaignConfig{Provider: "smtp", SmtpBatchSize: 1}
+		st.StageCampaign(&recipients, &csvText, &tmpl, &cfg)
+
+		assert.Equal(StateReady, st.GetState())
+		assert.Len(st.GetRecipients(), 1)
+		assert.Equal(csvText, st.GetCSVText())
+		assert.Equal("S", st.GetTemplate().Subject)
+		assert.Equal(1, st.GetConfig().SmtpBatchSize)
+		assert.Greater(st.GetRevision(), rev)
+
+		// Nil recipients keep existing staging untouched (config-only update).
+		rev = st.GetRevision()
+		st.StageCampaign(nil, nil, &tmpl, &cfg)
+		assert.Len(st.GetRecipients(), 1)
+		assert.Equal(StateReady, st.GetState())
+		assert.Greater(st.GetRevision(), rev)
+	})
 }
 
 func mustTimeParse(s string) time.Time {
