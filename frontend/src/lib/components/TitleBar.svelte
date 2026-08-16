@@ -7,9 +7,10 @@
         Copy,
         X,
         GlobeIcon,
-        Settings,
+        Bot,
         ChevronDown,
         ChevronUp,
+        CircleIcon,
     } from "@lucide/svelte";
     import {
         WindowMinimise,
@@ -163,7 +164,9 @@
     }
 
     async function clearMcpToken() {
-        await SaveConfig(JSON.stringify({ mcp: { token: "" } })).catch(() => {});
+        await SaveConfig(JSON.stringify({ mcp: { token: "" } })).catch(
+            () => {},
+        );
         refreshMcpStatus();
     }
 
@@ -396,16 +399,16 @@
                 title={t("mcp_settings")}
                 onclick={toggleMcp}
             >
-                <Settings class="size-4"></Settings>
-                <span
-                    class="badge badge-xs {mcpStatus === 'running'
-                        ? 'badge-success'
+                <Bot class="size-4"></Bot>
+                <CircleIcon
+                    class="size-2 {mcpStatus === 'running'
+                        ? 'fill-success'
                         : mcpStatus === 'error'
-                          ? 'badge-error'
+                          ? 'fill-error'
                           : mcpStatus === 'starting'
-                            ? 'badge-warning'
-                            : 'badge-neutral'}"
-                ></span>
+                            ? 'fill-warning'
+                            : 'fill-neutral'}"
+                ></CircleIcon>
                 {#if mcpDropdownOpen}
                     <ChevronUp class="size-3.5" />
                 {:else}
