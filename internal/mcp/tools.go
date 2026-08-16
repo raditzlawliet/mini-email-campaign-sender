@@ -238,7 +238,9 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 	if args.Verbose != nil {
 		cfg.Verbose = *args.Verbose
 	}
-	s.store.StageCampaign(newRecipients, newCSV, &tmpl, &cfg)
+	if err := s.store.StageCampaign(newRecipients, newCSV, &tmpl, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to stage campaign: %w", err)
+	}
 
 	s.store.LogAndEvent("info", "Campaign prepared via MCP")
 	return resultJSON(map[string]any{

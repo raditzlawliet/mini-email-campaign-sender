@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -144,14 +145,20 @@ func (s *Store) GetRevision() int {
 	return s.revision
 }
 
+// ErrCampaignRunning is returned when staging a campaign while one is running.
+var ErrCampaignRunning = errors.New("campaign is running")
+
 // StageCampaign atomically stages a prepared campaign (recipients, CSV text,
 // template, config) under one lock with a single revision bump, so readers
 // never observe a partially staged campaign. Nil values keep the current
 // value; recipients non-nil also (re)initializes statuses and moves state to
-// ready.
-func (s *Store) StageCampaign(recipients *[]Recipient, csvText *string, template *Template, config *CampaignConfig) {
+// ready. Rejected while a campaign is running.
+func (s *Store) StageCampaign(recipients *[]Recipient, csvText *string, template *Template, config *CampaignConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.state == StateRunning {
+		return ErrCampaignRunning
+	}
 	if recipients != nil {
 		s.recipients = *recipients
 		s.statuses = make([]RecipientStatus, len(*recipients))
@@ -170,6 +177,7 @@ func (s *Store) StageCampaign(recipients *[]Recipient, csvText *string, template
 		s.config = *config
 	}
 	s.revision++
+	return nil
 }
 
 // SetTemplate stores the email template.

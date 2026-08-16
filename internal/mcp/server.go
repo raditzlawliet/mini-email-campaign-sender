@@ -79,20 +79,23 @@ func (s *Server) Reconcile() {
 	}
 	s.lifecycleBusy = true
 	s.mu.Unlock()
-	defer func() {
+
+	release := func() {
 		s.mu.Lock()
 		s.lifecycleBusy = false
 		s.mu.Unlock()
-	}()
+	}
 
 	if !cfg.MCP.Enabled {
 		s.stopAsync()
+		release()
 		return
 	}
 	if !s.Running() {
 		if err := s.Start(); err != nil {
 			slog.Error("failed to start MCP server", "error", err)
 		}
+		release()
 		return
 	}
 
@@ -101,9 +104,22 @@ func (s *Server) Reconcile() {
 		s.startedCfg.Port != cfg.MCP.Port ||
 		s.startedCfg.Token != cfg.MCP.Token
 	s.mu.Unlock()
-	if changed {
-		s.restartAsync()
+	if !changed {
+		release()
+		return
 	}
+
+	// Hand lifecycle ownership to the restart goroutine: it stops the old
+	// listener, starts the new one, then releases lifecycleBusy. Concurrent
+	// Reconcile calls coalesce meanwhile, so a second listener is never bound
+	// and this owned restart is never skipped.
+	go func() {
+		s.Stop()
+		if err := s.Start(); err != nil {
+			slog.Error("failed to restart MCP server", "error", err)
+		}
+		release()
+	}()
 }
 
 // Start binds the streamable HTTP listener on the configured host:port and
@@ -112,6 +128,15 @@ func (s *Server) Start() error {
 	cfg := s.cfgProvider()
 	if !cfg.MCP.Enabled {
 		return nil
+	}
+	// The MCP endpoint is a local control surface: never bind a non-loopback
+	// host, even if config.yaml was hand-edited to something like 0.0.0.0.
+	if !isLoopbackHost(cfg.MCP.Host) {
+		err := fmt.Errorf("mcp host %q is not allowed: only loopback addresses (127.0.0.1, localhost, ::1) can be used", cfg.MCP.Host)
+		s.mu.Lock()
+		s.lastErr = err.Error()
+		s.mu.Unlock()
+		return err
 	}
 	addr := net.JoinHostPort(cfg.MCP.Host, strconv.Itoa(cfg.MCP.Port))
 	ln, err := net.Listen("tcp", addr)
@@ -156,6 +181,7 @@ func (s *Server) Start() error {
 	srv := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
@@ -229,33 +255,6 @@ func (s *Server) stopAsync() {
 		return
 	}
 	go s.Stop()
-}
-
-// restartAsync restarts the listener with current settings. Also used from
-// inside request handlers, hence async. Overlapping calls coalesce via the
-// lifecycleBusy guard.
-func (s *Server) restartAsync() {
-	if !s.Running() {
-		return
-	}
-	go func() {
-		s.mu.Lock()
-		if s.lifecycleBusy {
-			s.mu.Unlock()
-			return
-		}
-		s.lifecycleBusy = true
-		s.mu.Unlock()
-		defer func() {
-			s.mu.Lock()
-			s.lifecycleBusy = false
-			s.mu.Unlock()
-		}()
-		s.Stop()
-		if err := s.Start(); err != nil {
-			slog.Error("failed to restart MCP server", "error", err)
-		}
-	}()
 }
 
 func authorized(r *http.Request, token string) bool {

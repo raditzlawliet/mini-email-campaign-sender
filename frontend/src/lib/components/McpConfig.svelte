@@ -9,6 +9,7 @@
         status = "stopped",
         addr = "",
         errorMsg = "",
+        disabled = false,
         onsave = () => {},
         oncleartoken = () => {},
     } = $props();
@@ -66,6 +67,7 @@
                     class="btn btn-outline btn-sm"
                     type="button"
                     title={t("mcp_clear_token")}
+                    disabled={disabled}
                     onclick={oncleartoken}
                 >
                     {t("mcp_clear_token")}
@@ -100,7 +102,7 @@
         </div>
     </div>
     <div class="flex justify-end gap-2">
-        <button class="btn btn-outline btn-sm" onclick={onsave}
+        <button class="btn btn-outline btn-sm" disabled={disabled} onclick={onsave}
             >{t("mcp_apply")}</button
         >
     </div>

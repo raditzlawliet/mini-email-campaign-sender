@@ -84,6 +84,7 @@
     let mcpStatus = $state("stopped");
     let mcpAddr = $state("");
     let mcpError = $state("");
+    let mcpBusy = $state(false);
 
     async function refreshMaximized() {
         try {
@@ -151,22 +152,37 @@
     }
 
     async function saveMcp() {
-        const portNum = parseInt(mcpPort) || 18799;
-        const mcp = {
-            enabled: mcpEnabled,
-            host: mcpHost.trim() || "127.0.0.1",
-            port: portNum,
-        };
-        // token is redacted on load; only send it when the user typed a new one
-        if (mcpToken.trim()) mcp.token = mcpToken.trim();
-        await SaveConfig(JSON.stringify({ mcp })).catch(() => {});
+        if (mcpBusy) return;
+        mcpBusy = true;
+        try {
+            const portNum = parseInt(mcpPort) || 18799;
+            const mcp = {
+                enabled: mcpEnabled,
+                host: mcpHost.trim() || "127.0.0.1",
+                port: portNum,
+            };
+            // token is redacted on load; only send it when the user typed a new one
+            if (mcpToken.trim()) mcp.token = mcpToken.trim();
+            await SaveConfig(JSON.stringify({ mcp })).catch(() => {});
+        } finally {
+            mcpBusy = false;
+        }
         refreshMcpStatus();
     }
 
     async function clearMcpToken() {
-        await SaveConfig(JSON.stringify({ mcp: { token: "" } })).catch(
-            () => {},
-        );
+        if (mcpBusy) return;
+        // Reset the bound token synchronously so a later Apply cannot resend
+        // the typed token while the clear request is in flight.
+        mcpToken = "";
+        mcpBusy = true;
+        try {
+            await SaveConfig(JSON.stringify({ mcp: { token: "" } })).catch(
+                () => {},
+            );
+        } finally {
+            mcpBusy = false;
+        }
         refreshMcpStatus();
     }
 
@@ -428,6 +444,7 @@
                             status={mcpStatus}
                             addr={mcpAddr}
                             errorMsg={mcpError}
+                            disabled={mcpBusy}
                             onsave={saveMcp}
                             oncleartoken={clearMcpToken}
                         />

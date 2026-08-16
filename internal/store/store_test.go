@@ -6,6 +6,7 @@ import (
 
 	"github.com/raditzlawliet/test-mass-email/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStore(t *testing.T) {
@@ -101,6 +102,7 @@ func TestStore(t *testing.T) {
 
 	t.Run("StageCampaign stages atomically with one revision", func(t *testing.T) {
 		assert := assert.New(t)
+		require := require.New(t)
 
 		InitStore()
 		st := GetStore()
@@ -111,21 +113,34 @@ func TestStore(t *testing.T) {
 		csvText := "email\na@b.c\n"
 		tmpl := Template{Subject: "S", Body: "B", To: "T"}
 		cfg := CampaignConfig{Provider: "smtp", SmtpBatchSize: 1}
-		st.StageCampaign(&recipients, &csvText, &tmpl, &cfg)
+		require.NoError(st.StageCampaign(&recipients, &csvText, &tmpl, &cfg))
 
 		assert.Equal(StateReady, st.GetState())
 		assert.Len(st.GetRecipients(), 1)
 		assert.Equal(csvText, st.GetCSVText())
 		assert.Equal("S", st.GetTemplate().Subject)
 		assert.Equal(1, st.GetConfig().SmtpBatchSize)
-		assert.Greater(st.GetRevision(), rev)
+		assert.Equal(rev+1, st.GetRevision())
 
-		// Nil recipients keep existing staging untouched (config-only update).
+		// Nil recipients keep existing staging untouched (config-only update),
+		// and the revision advances by exactly one again.
 		rev = st.GetRevision()
-		st.StageCampaign(nil, nil, &tmpl, &cfg)
+		require.NoError(st.StageCampaign(nil, nil, &tmpl, &cfg))
 		assert.Len(st.GetRecipients(), 1)
 		assert.Equal(StateReady, st.GetState())
-		assert.Greater(st.GetRevision(), rev)
+		assert.Equal(rev+1, st.GetRevision())
+	})
+
+	t.Run("StageCampaign rejects while running", func(t *testing.T) {
+		assert := assert.New(t)
+
+		InitStore()
+		st := GetStore()
+		st.Reset()
+		st.StartCampaign()
+
+		err := st.StageCampaign(nil, nil, nil, nil)
+		assert.ErrorIs(err, ErrCampaignRunning)
 	})
 }
 

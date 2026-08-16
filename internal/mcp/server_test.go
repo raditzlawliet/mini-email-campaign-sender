@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -628,6 +629,51 @@ func TestServerStatus(t *testing.T) {
 		assert.Empty(addr)
 		assert.NotEmpty(errMsg)
 	})
+
+	t.Run("rejects non-loopback host", func(t *testing.T) {
+		assert := assert.New(t)
+		store.InitStore()
+		st := store.GetStore()
+		st.Reset()
+
+		cfg := testConfig()
+		cfg.MCP.Host = "0.0.0.0"
+		cfg.MCP.Port = 0
+		s := NewServer(st, func() *config.Config { return cfg }, "", "test", nil)
+
+		err := s.Start()
+		require.Error(t, err)
+		assert.Contains(err.Error(), "loopback")
+
+		status, _, errMsg := s.Status()
+		assert.Equal("error", status)
+		assert.NotEmpty(errMsg)
+	})
+
+	t.Run("reconcile restart applies new port", func(t *testing.T) {
+		assert := assert.New(t)
+		store.InitStore()
+		st := store.GetStore()
+		st.Reset()
+
+		p1, p2 := freePort(t), freePort(t)
+		cfg := testConfig()
+		cfg.MCP.Port = p1
+		s := NewServer(st, func() *config.Config { return cfg }, "", "test", nil)
+
+		require.NoError(t, s.Start())
+		assert.Contains(s.ListenAddr(), strconv.Itoa(p1))
+
+		// Change the port and reconcile: the owned restart must run (not be
+		// skipped by the lifecycleBusy guard) and rebind on the new port.
+		cfg.MCP.Port = p2
+		s.Reconcile()
+		require.Eventually(t, func() bool {
+			return s.Running() && strings.Contains(s.ListenAddr(), strconv.Itoa(p2))
+		}, 3*time.Second, 20*time.Millisecond)
+
+		s.Stop()
+	})
 }
 
 // TestCampaignWorkflowOverHTTP drives a realistic agent session over the real
@@ -712,6 +758,17 @@ func TestCampaignWorkflowOverHTTP(t *testing.T) {
 	txt = callText(t, base, 15, 16, "mecs_start_campaign", map[string]any{})
 	t.Logf("start_campaign (after clear) -> %s", txt)
 	assert.Contains(t, txt, "prepare_campaign")
+}
+
+// freePort reserves an ephemeral loopback TCP port and releases it, returning
+// the port number for tests that need a known-but-unused endpoint.
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	require.NoError(t, ln.Close())
+	return port
 }
 
 // rpcBatch performs a JSON-RPC batch request against the MCP endpoint and
