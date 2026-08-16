@@ -7,8 +7,10 @@
         Copy,
         X,
         GlobeIcon,
+        Bot,
         ChevronDown,
         ChevronUp,
+        CircleIcon,
     } from "@lucide/svelte";
     import {
         WindowMinimise,
@@ -25,6 +27,7 @@
         SaveConfig,
     } from "../wailsjs/go/app/App";
     import { t, setLanguage, getLanguage, LANGS } from "../i18n.svelte.js";
+    import McpConfig from "./McpConfig.svelte";
     import { app } from "../wailsjs/go/models";
 
     const REPO_URL =
@@ -72,6 +75,16 @@
     let langDropdownOpen = $state(false);
     let langRef = $state(null);
     let themeRef = $state(null);
+    let mcpDropdownOpen = $state(false);
+    let mcpRef = $state(null);
+    let mcpEnabled = $state(true);
+    let mcpHost = $state("127.0.0.1");
+    let mcpPort = $state("18799");
+    let mcpToken = $state("");
+    let mcpStatus = $state("stopped");
+    let mcpAddr = $state("");
+    let mcpError = $state("");
+    let mcpBusy = $state(false);
 
     async function refreshMaximized() {
         try {
@@ -112,7 +125,18 @@
             themeDropdownOpen = false;
         } else {
             langDropdownOpen = false;
+            mcpDropdownOpen = false;
             themeDropdownOpen = true;
+        }
+    }
+
+    function toggleMcp() {
+        if (mcpDropdownOpen) {
+            mcpDropdownOpen = false;
+        } else {
+            langDropdownOpen = false;
+            themeDropdownOpen = false;
+            mcpDropdownOpen = true;
         }
     }
 
@@ -120,10 +144,62 @@
         const path = e.composedPath();
         if (langRef && !path.includes(langRef)) langDropdownOpen = false;
         if (themeRef && !path.includes(themeRef)) themeDropdownOpen = false;
+        if (mcpRef && !path.includes(mcpRef)) mcpDropdownOpen = false;
     }
 
     async function persistTheme(theme) {
         SaveConfig(JSON.stringify({ app: { theme } })).catch(() => {});
+    }
+
+    async function saveMcp() {
+        if (mcpBusy) return;
+        mcpBusy = true;
+        try {
+            const portNum = parseInt(mcpPort) || 18799;
+            const mcp = {
+                enabled: mcpEnabled,
+                host: mcpHost.trim() || "127.0.0.1",
+                port: portNum,
+            };
+            // token is redacted on load; only send it when the user typed a new one
+            if (mcpToken.trim()) mcp.token = mcpToken.trim();
+            await SaveConfig(JSON.stringify({ mcp })).catch(() => {});
+        } finally {
+            mcpBusy = false;
+        }
+        refreshMcpStatus();
+    }
+
+    async function clearMcpToken() {
+        if (mcpBusy) return;
+        // Reset the bound token synchronously so a later Apply cannot resend
+        // the typed token while the clear request is in flight.
+        mcpToken = "";
+        mcpBusy = true;
+        try {
+            await SaveConfig(JSON.stringify({ mcp: { token: "" } })).catch(
+                () => {},
+            );
+        } finally {
+            mcpBusy = false;
+        }
+        refreshMcpStatus();
+    }
+
+    async function refreshMcpStatus() {
+        try {
+            const data = await GetCampaignConfig();
+            mcpEnabled = data.mcp?.enabled ?? true;
+            mcpHost = data.mcp?.host || "127.0.0.1";
+            mcpPort = data.mcp?.port?.toString() || "18799";
+            mcpToken = ""; // redacted by backend
+            mcpStatus =
+                data.mcp?.status || (data.mcp?.running ? "running" : "stopped");
+            mcpAddr = data.mcp?.addr || "";
+            mcpError = data.mcp?.error || "";
+        } catch {
+            // keep current values on failure
+        }
     }
 
     function selectTheme(theme) {
@@ -161,6 +237,15 @@
                 currentTheme = theme;
                 document.documentElement.dataset.theme = currentTheme;
                 setLanguage(lang);
+                mcpEnabled = data?.mcp?.enabled ?? true;
+                mcpHost = data?.mcp?.host || "127.0.0.1";
+                mcpPort = data?.mcp?.port?.toString() || "18799";
+                mcpToken = ""; // redacted by backend
+                mcpStatus =
+                    data?.mcp?.status ||
+                    (data?.mcp?.running ? "running" : "stopped");
+                mcpAddr = data?.mcp?.addr || "";
+                mcpError = data?.mcp?.error || "";
             } catch {
                 currentTheme = "dark";
                 setLanguage("en");
@@ -314,6 +399,56 @@
                             </li>
                         {/each}
                     </ul>
+                </div>
+            {/if}
+        </div>
+
+        <!-- MCP settings -->
+        <div
+            class="dropdown dropdown-end dropdown-bottom"
+            class:dropdown-open={mcpDropdownOpen}
+            bind:this={mcpRef}
+        >
+            <button
+                class="btn btn-ghost btn-sm gap-1 px-2"
+                aria-label={t("mcp_settings")}
+                title={t("mcp_settings")}
+                onclick={toggleMcp}
+            >
+                <Bot class="size-4"></Bot>
+                <CircleIcon
+                    class="size-2 {mcpStatus === 'running'
+                        ? 'fill-success'
+                        : mcpStatus === 'error'
+                          ? 'fill-error'
+                          : mcpStatus === 'starting'
+                            ? 'fill-warning'
+                            : 'fill-neutral'}"
+                ></CircleIcon>
+                {#if mcpDropdownOpen}
+                    <ChevronUp class="size-3.5" />
+                {:else}
+                    <ChevronDown class="size-3.5" />
+                {/if}
+            </button>
+            {#if mcpDropdownOpen}
+                <div
+                    class="dropdown-content bg-base-200 rounded-box z-1 w-80 shadow-2xl"
+                >
+                    <div class="p-3">
+                        <McpConfig
+                            bind:enabled={mcpEnabled}
+                            bind:host={mcpHost}
+                            bind:port={mcpPort}
+                            bind:token={mcpToken}
+                            status={mcpStatus}
+                            addr={mcpAddr}
+                            errorMsg={mcpError}
+                            disabled={mcpBusy}
+                            onsave={saveMcp}
+                            oncleartoken={clearMcpToken}
+                        />
+                    </div>
                 </div>
             {/if}
         </div>

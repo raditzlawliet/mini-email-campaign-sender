@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/raditzlawliet/test-mass-email/internal/campaign"
 	"github.com/raditzlawliet/test-mass-email/internal/config"
+	"github.com/raditzlawliet/test-mass-email/internal/mcp"
 	"github.com/raditzlawliet/test-mass-email/internal/store"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -18,9 +20,13 @@ import (
 type App struct {
 	ctx           context.Context
 	defaultConfig *config.Config
+	cfgMu         sync.RWMutex
 	store         *store.Store
 	configPath    string
 	version       string
+
+	mcpSrv *mcp.Server
+	mcpMu  sync.Mutex
 }
 
 // NewApp creates the Wails application instance.
@@ -37,6 +43,7 @@ func NewApp(defaultCfg *config.Config, st *store.Store, configPath string, versi
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 	go a.emitProgressLoop()
+	a.reconcileMCP()
 }
 
 // emitProgressLoop pushes progress + log events to the frontend every 1s,
@@ -56,8 +63,65 @@ func (a *App) emitProgressLoop() {
 		runtime.EventsEmit(a.ctx, "campaign:progress", map[string]any{
 			"progress": a.store.GetProgress(),
 			"events":   events,
+			"revision": a.store.GetRevision(),
 		})
 	}
+}
+
+// reloadConfig reloads config.yaml into memory and reconciles the MCP server.
+func (a *App) reloadConfig() error {
+	cfg, err := config.Load(a.configPath)
+	if err != nil {
+		return fmt.Errorf("failed to reload config: %w", err)
+	}
+	a.cfgMu.Lock()
+	a.defaultConfig = cfg
+	a.cfgMu.Unlock()
+	a.reconcileMCP()
+	return nil
+}
+
+// currentConfig returns the current global config under a read lock.
+func (a *App) currentConfig() *config.Config {
+	a.cfgMu.RLock()
+	defer a.cfgMu.RUnlock()
+	return a.defaultConfig
+}
+
+// reconcileMCP ensures the embedded MCP server exists and matches the mcp
+// config section (start/stop/restart handled inside the server).
+func (a *App) reconcileMCP() {
+	a.mcpMu.Lock()
+	if a.mcpSrv == nil {
+		a.mcpSrv = mcp.NewServer(
+			a.store,
+			func() *config.Config { return a.currentConfig() },
+			a.configPath,
+			a.version,
+			a.reloadConfig,
+		)
+	}
+	srv := a.mcpSrv
+	a.mcpMu.Unlock()
+	srv.Reconcile()
+}
+
+// mcpRunning reports whether the MCP HTTP listener is currently active.
+func (a *App) mcpRunning() bool {
+	a.mcpMu.Lock()
+	defer a.mcpMu.Unlock()
+	return a.mcpSrv != nil && a.mcpSrv.Running()
+}
+
+// mcpStatus reports the live MCP server status: one of running/starting/
+// error/stopped, plus the actual bound address and last start error.
+func (a *App) mcpStatus() (status, addr, errMsg string) {
+	a.mcpMu.Lock()
+	defer a.mcpMu.Unlock()
+	if a.mcpSrv == nil {
+		return "stopped", "", ""
+	}
+	return a.mcpSrv.Status()
 }
 
 // GetVersion returns the application version.
@@ -70,29 +134,41 @@ func (a *App) GetCampaignConfig() map[string]any {
 	st := a.store
 	tmpl := st.GetTemplate()
 	cfg := st.GetConfig()
+	mcpStatus, mcpAddr, mcpErr := a.mcpStatus()
+	dflt := a.currentConfig()
 
 	return map[string]any{
 		"app": map[string]any{
-			"theme":    a.defaultConfig.App.Theme,
-			"language": a.defaultConfig.App.Language,
+			"theme":    dflt.App.Theme,
+			"language": dflt.App.Language,
 		},
 		"email": map[string]any{
-			"provider": a.defaultConfig.Email.Provider,
-			"from":     a.defaultConfig.Email.From,
-			"smtp":     a.defaultConfig.Email.SMTP,
-			"ses":      a.defaultConfig.Email.SES,
+			"provider": dflt.Email.Provider,
+			"from":     dflt.Email.From,
+			"smtp":     dflt.Email.SMTP,
+			"ses":      dflt.Email.SES,
 		},
 		"worker": map[string]any{
-			"concurrency":        a.defaultConfig.Worker.Concurrency,
-			"max_retries":        a.defaultConfig.Worker.MaxRetries,
-			"retry_backoff_base": a.defaultConfig.Worker.RetryBackoffBase.String(),
-			"retry_backoff_max":  a.defaultConfig.Worker.RetryBackoffMax.String(),
+			"concurrency":        dflt.Worker.Concurrency,
+			"max_retries":        dflt.Worker.MaxRetries,
+			"retry_backoff_base": dflt.Worker.RetryBackoffBase.String(),
+			"retry_backoff_max":  dflt.Worker.RetryBackoffMax.String(),
 		},
 		"log": map[string]any{
 			"campaign": map[string]any{
-				"log_to_file": a.defaultConfig.Log.Campaign.LogToFile,
-				"verbose":     a.defaultConfig.Log.Campaign.Verbose,
+				"log_to_file": dflt.Log.Campaign.LogToFile,
+				"verbose":     dflt.Log.Campaign.Verbose,
 			},
+		},
+		"mcp": map[string]any{
+			"enabled": dflt.MCP.Enabled,
+			"host":    dflt.MCP.Host,
+			"port":    dflt.MCP.Port,
+			"token":   "", // redacted
+			"running": a.mcpRunning(),
+			"status":  mcpStatus,
+			"addr":    mcpAddr,
+			"error":   mcpErr,
 		},
 		"campaign": map[string]any{
 			"state":    st.GetState(),
@@ -100,6 +176,8 @@ func (a *App) GetCampaignConfig() map[string]any {
 			"events":   st.GetEvents(),
 			"template": tmpl,
 			"config":   cfg,
+			"csv_text": st.GetCSVText(),
+			"revision": st.GetRevision(),
 		},
 	}
 }
@@ -216,7 +294,8 @@ func (a *App) StartCampaign(in CampaignInput) error {
 		return fmt.Errorf("campaign is already running")
 	}
 
-	logCfg := a.defaultConfig.Log.Campaign
+	dflt := a.currentConfig()
+	logCfg := dflt.Log.Campaign
 	if in.LogToFile {
 		logCfg.LogToFile = true
 	}
@@ -231,7 +310,7 @@ func (a *App) StartCampaign(in CampaignInput) error {
 	}
 
 	ctx := context.Background()
-	if err := campaign.StartCampaign(ctx, a.defaultConfig, a.store, buildRequest(in, csv), logger); err != nil {
+	if err := campaign.StartCampaign(ctx, dflt, a.store, buildRequest(in, csv), logger); err != nil {
 		return err
 	}
 	return nil
@@ -255,6 +334,7 @@ func (a *App) ResumeCampaign() error {
 	ctx := context.Background()
 	tmpl := a.store.GetTemplate()
 	cfg := a.store.GetConfig()
+	dflt := a.currentConfig()
 
 	req := campaign.CampaignRequest{
 		Subject:       tmpl.Subject,
@@ -275,7 +355,7 @@ func (a *App) ResumeCampaign() error {
 		req.BackoffMax = cfg.Worker.RetryBackoffMax.String()
 	}
 
-	logCfg := a.defaultConfig.Log.Campaign
+	logCfg := dflt.Log.Campaign
 	if cfg.LogToFile {
 		logCfg.LogToFile = true
 	}
@@ -288,7 +368,7 @@ func (a *App) ResumeCampaign() error {
 	if err != nil {
 		return fmt.Errorf("failed to create campaign logger: %w", err)
 	}
-	if err := campaign.ResumeCampaign(ctx, a.defaultConfig, a.store, req, logger); err != nil {
+	if err := campaign.ResumeCampaign(ctx, dflt, a.store, req, logger); err != nil {
 		return err
 	}
 	return nil
@@ -308,12 +388,7 @@ func (a *App) SaveConfig(partialJSON string) error {
 	if err := config.SavePartial(a.configPath, []byte(partialJSON)); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
-	cfg, err := config.Load(a.configPath)
-	if err != nil {
-		return fmt.Errorf("failed to reload config: %w", err)
-	}
-	a.defaultConfig = cfg
-	return nil
+	return a.reloadConfig()
 }
 
 // PickCSVFile opens a native file dialog and returns the selected CSV path.

@@ -74,6 +74,23 @@ const translations = {
     verbose_logging_desc:
       "Include per-email send/retry debug details in log and frontend",
 
+    mcp_settings: "MCP Server",
+    mcp_enabled: "Enable MCP server",
+    mcp_enabled_desc:
+      "Allow AI agents to control campaigns via MCP on localhost",
+    mcp_host: "Host",
+    mcp_port: "Port",
+    mcp_token: "Token (optional)",
+    mcp_clear_token: "Clear",
+    mcp_token_desc:
+      "If set, clients must send Authorization: Bearer <token>",
+    mcp_token_placeholder: "leave empty for no auth",
+    mcp_running: "Running",
+    mcp_stopped: "Stopped",
+    mcp_starting: "Starting...",
+    mcp_error: "Error",
+    mcp_apply: "Apply",
+
     loading_config: "Loading configuration...",
     email_provider_tab: "Email Provider",
     worker_tab: "Worker",
@@ -87,6 +104,8 @@ const translations = {
     start_campaign: "Start Campaign",
     reset: "Reset",
     provide_csv: "Provide CSV data to enable Preview and Start.",
+    csv_too_large:
+      "Staged CSV is too large to display in the editor. It is kept in memory - start from the AI/MCP side or use a smaller CSV here.",
     progress: "Progress",
     running: "Running",
     paused: "Paused",
@@ -196,6 +215,23 @@ const translations = {
     verbose_logging: "تسجيل مفصّل",
     verbose_logging_desc: "تضمين تفاصيل تصحيح لكل بريد في السجل والواجهة",
 
+    mcp_settings: "خادم MCP",
+    mcp_enabled: "تفعيل خادم MCP",
+    mcp_enabled_desc:
+      "السماح لوكلاء الذكاء الاصطناعي بالتحكم في الحملات عبر MCP على localhost",
+    mcp_host: "المضيف",
+    mcp_port: "المنفذ",
+    mcp_token: "الرمز المميز (اختياري)",
+    mcp_clear_token: "مسح",
+    mcp_token_desc:
+      "إذا تم تعيينه، يجب على العملاء إرسال Authorization: Bearer <token>",
+    mcp_token_placeholder: "اتركه فارغًا بدون مصادقة",
+    mcp_running: "يعمل",
+    mcp_stopped: "متوقف",
+    mcp_starting: "جارٍ التشغيل...",
+    mcp_error: "خطأ",
+    mcp_apply: "تطبيق",
+
     loading_config: "جارٍ تحميل الإعدادات...",
     email_provider_tab: "مزوّد البريد",
     worker_tab: "العامل",
@@ -208,7 +244,9 @@ const translations = {
     resume: "استئناف",
     start_campaign: "بدء الحملة",
     reset: "إعادة تعيين",
-    provide_csv: "قدّم بيانات CSV لتفعيل المعاينة والبدء.",
+    provide_csv: "وفّر بيانات CSV لتفعيل المعاينة والبدء.",
+    csv_too_large:
+      "ملف CSV المُعد كبير جدًا للعرض في المحرر. يُحتفظ به في الذاكرة - ابدأ من جانب الذكاء الاصطناعي/MCP أو استخدم CSV أصغر هنا.",
     progress: "التقدّم",
     running: "قيد التشغيل",
     paused: "متوقف مؤقتاً",
@@ -319,6 +357,23 @@ const translations = {
     verbose_logging: "Log verbose",
     verbose_logging_desc: "Sertakan detail debug per-email di log dan frontend",
 
+    mcp_settings: "Server MCP",
+    mcp_enabled: "Aktifkan server MCP",
+    mcp_enabled_desc:
+      "Izinkan agen AI mengontrol kampanye melalui MCP di localhost",
+    mcp_host: "Host",
+    mcp_port: "Port",
+    mcp_token: "Token (opsional)",
+    mcp_clear_token: "Hapus",
+    mcp_token_desc:
+      "Jika diisi, klien harus mengirim Authorization: Bearer <token>",
+    mcp_token_placeholder: "kosongkan untuk tanpa autentikasi",
+    mcp_running: "Berjalan",
+    mcp_stopped: "Berhenti",
+    mcp_starting: "Memulai...",
+    mcp_error: "Error",
+    mcp_apply: "Terapkan",
+
     loading_config: "Memuat konfigurasi...",
     email_provider_tab: "Penyedia Email",
     worker_tab: "Worker",
@@ -332,6 +387,8 @@ const translations = {
     start_campaign: "Mulai Kampanye",
     reset: "Reset",
     provide_csv: "Sediakan data CSV untuk mengaktifkan Pratinjau dan Mulai.",
+    csv_too_large:
+      "CSV yang disiapkan terlalu besar untuk ditampilkan di editor. Disimpan di memori - mulai dari sisi AI/MCP atau gunakan CSV yang lebih kecil di sini.",
     progress: "Progress",
     running: "Berjalan",
     paused: "Dijeda",

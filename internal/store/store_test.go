@@ -6,6 +6,7 @@ import (
 
 	"github.com/raditzlawliet/test-mass-email/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStore(t *testing.T) {
@@ -46,10 +47,15 @@ func TestStore(t *testing.T) {
 		assert.Equal(1, prog.Sent)
 		assert.Equal(1, prog.Pending)
 
+		// CSV text round-trip
+		st.SetCSVText("email\nalice@example.com\n")
+		assert.Equal("email\nalice@example.com\n", st.GetCSVText())
+
 		// Reset
 		st.Reset()
 		assert.Equal(StateIdle, st.GetState())
 		assert.Empty(st.GetRecipients())
+		assert.Empty(st.GetCSVText())
 	})
 
 	t.Run("SetConfig merges overrides", func(t *testing.T) {
@@ -65,6 +71,76 @@ func TestStore(t *testing.T) {
 		cfg := st.GetConfig()
 		assert.Equal("ses", cfg.Provider)
 		assert.Equal(20, cfg.Worker.Concurrency)
+	})
+
+	t.Run("revision bumps on mutations", func(t *testing.T) {
+		assert := assert.New(t)
+
+		InitStore()
+		st := GetStore()
+		rev := st.GetRevision()
+
+		st.SetCSV([]Recipient{{Index: 0, Data: map[string]string{"email": "a@b.c"}, Email: "a@b.c"}})
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.SetCSVText("email\na@b.c\n")
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.SetTemplate(Template{Subject: "S"})
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.SetConfig(CampaignConfig{Provider: "smtp"})
+		assert.Greater(st.GetRevision(), rev)
+		rev = st.GetRevision()
+
+		st.Reset()
+		assert.Greater(st.GetRevision(), rev)
+	})
+
+	t.Run("StageCampaign stages atomically with one revision", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		InitStore()
+		st := GetStore()
+		st.Reset()
+		rev := st.GetRevision()
+
+		recipients := []Recipient{{Index: 0, Data: map[string]string{"email": "a@b.c"}, Email: "a@b.c"}}
+		csvText := "email\na@b.c\n"
+		tmpl := Template{Subject: "S", Body: "B", To: "T"}
+		cfg := CampaignConfig{Provider: "smtp", SmtpBatchSize: 1}
+		require.NoError(st.StageCampaign(&recipients, &csvText, &tmpl, &cfg))
+
+		assert.Equal(StateReady, st.GetState())
+		assert.Len(st.GetRecipients(), 1)
+		assert.Equal(csvText, st.GetCSVText())
+		assert.Equal("S", st.GetTemplate().Subject)
+		assert.Equal(1, st.GetConfig().SmtpBatchSize)
+		assert.Equal(rev+1, st.GetRevision())
+
+		// Nil recipients keep existing staging untouched (config-only update),
+		// and the revision advances by exactly one again.
+		rev = st.GetRevision()
+		require.NoError(st.StageCampaign(nil, nil, &tmpl, &cfg))
+		assert.Len(st.GetRecipients(), 1)
+		assert.Equal(StateReady, st.GetState())
+		assert.Equal(rev+1, st.GetRevision())
+	})
+
+	t.Run("StageCampaign rejects while running", func(t *testing.T) {
+		assert := assert.New(t)
+
+		InitStore()
+		st := GetStore()
+		st.Reset()
+		st.StartCampaign()
+
+		err := st.StageCampaign(nil, nil, nil, nil)
+		assert.ErrorIs(err, ErrCampaignRunning)
 	})
 }
 

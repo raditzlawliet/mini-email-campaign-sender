@@ -22,6 +22,7 @@ Desktop app (Wails v2) to send personalized email campaigns via SMTP or Amazon S
 - **Multi-language** — English, Arabic (RTL), and Bahasa Indonesia
 - **Theme picker** — choose from all DaisyUI themes, auto-persisted to your config
 - **Secure credentials** — SMTP and SES credentials automatically stored in OS keyring
+- **MCP server (AI agents)** — embedded Model Context Protocol server on localhost so AI agents can prepare, dry-run, start, pause, resume, monitor, and clear campaigns (see [MCP Server](#mcp-server-ai-agents))
 
 ## Supported Providers
 
@@ -80,6 +81,12 @@ log:
   campaign:
     log_to_file: true # write campaign events to logs/campaign_*.log
     verbose: false # include per-email debug detail
+
+mcp:
+  enabled: true # embedded MCP server for AI agents (localhost only)
+  host: "127.0.0.1"
+  port: 18799
+  token: "" # optional bearer token; empty = no auth
 ```
 
 | Section        | Key                  | Default     | Description                                                    |
@@ -104,6 +111,10 @@ log:
 | `worker`       | `retry_backoff_max`  | `30s`       | Max retry delay cap                                            |
 | `log.campaign` | `log_to_file`        | `true`      | Write per-run JSON log file                                    |
 | `log.campaign` | `verbose`            | `false`     | Enable debug-level detail                                      |
+| `mcp`          | `enabled`            | `true`      | Enable the embedded MCP server (binds to `host`)              |
+| `mcp`          | `host`               | `127.0.0.1` | Listen address (keep localhost for security)                  |
+| `mcp`          | `port`               | `18799`     | MCP endpoint port                                             |
+| `mcp`          | `token`              | —           | Optional bearer token; clients must send `Authorization: Bearer <token>` |
 
 ## Development
 
@@ -174,6 +185,7 @@ internal/
   email/                 # SMTP (batched) & SES senders, template rendering
   store/                 # In-memory campaign state, event log, verbose flag
   campaign/              # CSV parsing, campaign orchestration, file logging
+  mcp/                   # Embedded MCP server (go-sdk, streamable HTTP, 9 tools)
 frontend/                # Svelte 5 + TailwindCSS v4 + DaisyUI v5 (Wails WebView)
 ```
 
@@ -212,6 +224,49 @@ Each campaign run can write a structured JSON log file at `logs/campaign_<timest
 
 - Set `log.campaign.log_to_file: false` to disable file logging
 - Set `log.campaign.verbose: true` to include debug-level per-email events
+
+## MCP Server (AI Agents)
+
+MECS embeds a [Model Context Protocol](https://modelcontextprotocol.io) server (official `github.com/modelcontextprotocol/go-sdk`) served over streamable HTTP on localhost, so AI agents (Claude Code, Zed, any MCP client) can drive campaigns programmatically. The endpoint is `http://127.0.0.1:18799/mcp` (configurable via the `mcp` section, see [Configuration](#configuration)). A plain health check is available at `/mcp/health`.
+
+AI actions share the same state as the UI: a campaign started via MCP shows live in the frontend and vice versa. Secrets (SMTP password, SES keys, MCP token) are always masked in read responses.
+
+### Tools
+
+| Tool | Purpose |
+| --- | --- |
+| `mecs_prepare_campaign` | Stage a campaign without sending: CSV (text or file path) + partial template, provider, worker, and log settings (empty values keep current staging) |
+| `mecs_get_current_campaign` | Current state: lifecycle, progress counters, staged template/config, optional recent events |
+| `mecs_set_config` | Deep-merge partial JSON into `config.yaml` (same as the UI's Save as defaults) |
+| `mecs_get_config` | Current global config, optionally filtered by section (`app`, `email`, `worker`, `log`, `mcp`) |
+| `mecs_dry_run_campaign` | Render sample emails (max 5) from the prepared campaign without sending |
+| `mecs_start_campaign` | Start sending the prepared campaign (global defaults fill any gaps) |
+| `mecs_pause_campaign` | Gracefully pause the running campaign |
+| `mecs_resume_campaign` | Resume a paused campaign (pending recipients only) |
+| `mecs_clear_campaign` | Clear all campaign state back to idle |
+
+### Example client setup (Claude Code)
+
+Add a local MCP server entry pointing at MECS (run MECS first):
+
+```json
+{
+  "mcpServers": {
+    "mecs": {
+      "url": "http://127.0.0.1:18799/mcp"
+    }
+  }
+}
+```
+
+If a token is configured, add `"headers": { "Authorization": "Bearer <token>" }` to the `mecs` entry.
+
+### Security notes
+
+- The server binds to `127.0.0.1` by default - only processes on the same machine can connect. Set `mcp.host` to a different interface only if you understand the risk.
+- Set `mcp.token` to require `Authorization: Bearer <token>` on every request.
+- Changing `mcp.*` via `mecs_set_config` or the UI restarts the server with the new settings immediately.
+- `csv_path` allows an agent to read any file the MECS process can read (same user).
 
 ## Contributors
 

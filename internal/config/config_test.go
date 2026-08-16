@@ -133,6 +133,73 @@ email:
 		assert.NoError(err)
 	})
 
+	t.Run("mcp defaults when section missing", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+email:
+  provider: smtp
+`), 0644)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		// No mcp section in the file: disabled (enable it in config.yaml
+		// or via the MCP tab). Host/port still get sensible defaults.
+		assert.False(cfg.MCP.Enabled)
+		assert.Equal("127.0.0.1", cfg.MCP.Host)
+		assert.Equal(18799, cfg.MCP.Port)
+	})
+
+	t.Run("mcp explicit disabled is respected", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+mcp:
+  enabled: false
+  host: "127.0.0.1"
+  port: 18799
+`), 0644)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		assert.False(cfg.MCP.Enabled)
+		assert.Equal(18799, cfg.MCP.Port)
+	})
+
+	t.Run("mcp custom port and token", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+mcp:
+  enabled: true
+  host: "0.0.0.0"
+  port: 9000
+  token: "s3cret"
+`), 0644)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+
+		assert.True(cfg.MCP.Enabled)
+		assert.Equal("0.0.0.0", cfg.MCP.Host)
+		assert.Equal(9000, cfg.MCP.Port)
+		assert.Equal("s3cret", cfg.MCP.Token)
+	})
+
 	t.Run("loads secrets from keyring when provider type is keyring", func(t *testing.T) {
 		assert := assert.New(t)
 		require := require.New(t)
@@ -298,6 +365,35 @@ worker:
 		assert.True(appIdx < serverIdx, "app should come before server")
 		assert.True(serverIdx < emailIdx, "server should come before email")
 		assert.True(emailIdx < workerIdx, "email should come before worker")
+	})
+
+	t.Run("merge mcp port", func(t *testing.T) {
+		assert := assert.New(t)
+		require := require.New(t)
+
+		tmp := t.TempDir()
+		path := tmp + "/config.yaml"
+		err := os.WriteFile(path, []byte(`
+app:
+  theme: dark
+mcp:
+  enabled: true
+  host: "127.0.0.1"
+  port: 18799
+`), 0644)
+		require.NoError(err)
+
+		partial, _ := json.Marshal(map[string]any{
+			"mcp": map[string]any{"port": 19000},
+		})
+		err = SavePartial(path, partial)
+		require.NoError(err)
+
+		cfg, err := Load(path)
+		require.NoError(err)
+		assert.Equal(19000, cfg.MCP.Port)
+		assert.True(cfg.MCP.Enabled)
+		assert.Equal("127.0.0.1", cfg.MCP.Host)
 	})
 
 	t.Run("missing file returns error", func(t *testing.T) {

@@ -13,3 +13,9 @@ nul
 # Generated CSV data
 tools/gencsv/*.exe
 tools/gencsv/output.csv
+
+# Zed
+.zed/
+
+# Agents
+AGENTS.md

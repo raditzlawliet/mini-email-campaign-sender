@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -69,10 +70,12 @@ type Store struct {
 	statuses   []RecipientStatus
 	template   Template
 	config     CampaignConfig
+	csvText    string
 	state      CampaignState
 	events     []LogEntry
 	cancelFn   context.CancelFunc
 	verbose    bool
+	revision   int
 }
 
 var (
@@ -114,6 +117,67 @@ func (s *Store) SetCSV(recipients []Recipient) {
 		s.statuses[i] = RecipientStatus{Status: "pending"}
 	}
 	s.state = StateReady
+	s.revision++
+}
+
+// SetCSVText stores the raw CSV text used for the prepared campaign.
+// Used by the MCP server so a campaign can be started without re-passing CSV.
+func (s *Store) SetCSVText(text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.csvText = text
+	s.revision++
+}
+
+// GetCSVText returns the raw CSV text of the prepared campaign.
+func (s *Store) GetCSVText() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.csvText
+}
+
+// GetRevision returns a monotonically increasing counter that bumps whenever
+// campaign state (CSV, template, config) changes. The frontend uses it to
+// re-sync the form when a campaign is staged via MCP.
+func (s *Store) GetRevision() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.revision
+}
+
+// ErrCampaignRunning is returned when staging a campaign while one is running.
+var ErrCampaignRunning = errors.New("campaign is running")
+
+// StageCampaign atomically stages a prepared campaign (recipients, CSV text,
+// template, config) under one lock with a single revision bump, so readers
+// never observe a partially staged campaign. Nil values keep the current
+// value; recipients non-nil also (re)initializes statuses and moves state to
+// ready. Rejected while a campaign is running.
+func (s *Store) StageCampaign(recipients *[]Recipient, csvText *string, template *Template, config *CampaignConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state == StateRunning {
+		return ErrCampaignRunning
+	}
+	if recipients != nil {
+		s.recipients = *recipients
+		s.statuses = make([]RecipientStatus, len(*recipients))
+		for i := range s.statuses {
+			s.statuses[i] = RecipientStatus{Status: "pending"}
+		}
+		s.state = StateReady
+	}
+	if csvText != nil {
+		s.csvText = *csvText
+	}
+	if template != nil {
+		s.template = *template
+	}
+	if config != nil {
+		s.config = *config
+	}
+	s.revision++
+	return nil
 }
 
 // SetTemplate stores the email template.
@@ -121,6 +185,7 @@ func (s *Store) SetTemplate(t Template) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.template = t
+	s.revision++
 }
 
 // SetConfig stores campaign-level overrides.
@@ -128,6 +193,7 @@ func (s *Store) SetConfig(c CampaignConfig) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.config = c
+	s.revision++
 }
 
 // StartCampaign transitions state to running.
@@ -287,8 +353,10 @@ func (s *Store) Reset() {
 	s.statuses = []RecipientStatus{}
 	s.template = Template{}
 	s.config = CampaignConfig{}
+	s.csvText = ""
 	s.events = []LogEntry{}
 	s.state = StateIdle
+	s.revision++
 	if s.cancelFn != nil {
 		s.cancelFn()
 		s.cancelFn = nil
