@@ -85,7 +85,7 @@ jobs:
       - name: Compress
         shell: bash
         run: |
-          zip -9q ./build/bin/mecs-windows-x64.zip -j ./build/bin/mecs.exe
+          7z a -tzip -mx=9 ./build/bin/mecs-windows-x64.zip ./build/bin/mecs.exe
 
       - name: Upload
         uses: actions/upload-artifact@v4
