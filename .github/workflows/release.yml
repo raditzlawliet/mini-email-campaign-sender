@@ -83,6 +83,7 @@ jobs:
           wails build -platform windows/amd64 -nsis -ldflags "-X main.version=${{ needs.prepare.outputs.version }}" -trimpath
 
       - name: Compress
+        shell: bash
         run: |
           zip -9q ./build/bin/mecs-windows-x64.zip -j ./build/bin/mecs.exe
 
