@@ -3,7 +3,6 @@ frontend/dist/
 frontend/node_modules/
 frontend/package.json.md5
 frontend/src/lib/wailsjs/
-cmd/server/frontend_dist/
 build/
 logs/
 *.log
@@ -12,10 +11,11 @@ nul
 
 # Generated CSV data
 tools/gencsv/*.exe
-tools/gencsv/output.csv
+tools/gencsv/*.csv
 
 # Zed
 .zed/
 
 # Agents
 AGENTS.md
+CLAUDE.md
