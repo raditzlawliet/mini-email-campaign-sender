@@ -250,6 +250,8 @@
                 body = "";
                 toField = "";
                 csvText = "";
+                csvFilePath = "";
+                fileName = "";
                 csvCount = 0;
                 manualMode = false;
                 csvTooLarge = false;
@@ -321,8 +323,15 @@
         }
         // Config overrides
         applyConfig(camp.config);
-        // CSV prepared via MCP shows in manual mode
-        if (camp.csv_text) {
+        // CSV prepared via MCP by file path: streamed from disk, shown as a file
+        if (camp.csv_path) {
+            manualMode = false;
+            csvText = "";
+            csvTooLarge = false;
+            csvFilePath = camp.csv_path;
+            fileName = camp.csv_path.split(/[\\/]/).pop() || camp.csv_path;
+            csvCount = camp.progress?.total || 0;
+        } else if (camp.csv_text) {
             manualMode = true;
             csvCount = camp.progress?.total || 0;
             if (camp.csv_text.length <= MAX_CSV_TEXT) {

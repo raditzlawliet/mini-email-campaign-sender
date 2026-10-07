@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -130,28 +129,25 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, nil, errors.New("campaign is running: pause or wait for it to finish before preparing a new campaign")
 	}
 
-	// CSV: text, or file path, or keep current staging.
-	csvText := ""
-	if args.CSVText != "" {
-		csvText = args.CSVText
-	} else if args.CSVPath != "" {
-		data, err := os.ReadFile(args.CSVPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read csv_path %q: %w", args.CSVPath, err)
-		}
-		csvText = string(data)
-	}
-
+	// CSV: text, or file path (streamed from disk), or keep current staging.
 	var newRecipients *[]store.Recipient
-	var newCSV *string
+	var newCSV, newCSVPath *string
 	recipientCount := -1
-	if csvText != "" {
-		recipients, err := campaign.ParseCSV(csvText)
+	if args.CSVText != "" {
+		recipients, err := campaign.ParseCSV(args.CSVText)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid CSV: %w", err)
 		}
-		newRecipients = &recipients
-		newCSV = &csvText
+		empty := ""
+		newRecipients, newCSV, newCSVPath = &recipients, &args.CSVText, &empty
+		recipientCount = len(recipients)
+	} else if args.CSVPath != "" {
+		recipients, err := campaign.ParseCSVFile(args.CSVPath, 0)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid csv_path %q: %w", args.CSVPath, err)
+		}
+		empty := ""
+		newRecipients, newCSV, newCSVPath = &recipients, &empty, &args.CSVPath
 		recipientCount = len(recipients)
 	}
 
@@ -238,7 +234,7 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 	if args.Verbose != nil {
 		cfg.Verbose = *args.Verbose
 	}
-	if err := s.store.StageCampaign(newRecipients, newCSV, &tmpl, &cfg); err != nil {
+	if err := s.store.StageCampaign(newRecipients, newCSV, newCSVPath, &tmpl, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("failed to stage campaign: %w", err)
 	}
 
@@ -247,7 +243,7 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 		"status":       "prepared",
 		"state":        s.store.GetState(),
 		"recipients":   s.recipientCount(recipientCount),
-		"csv_prepared": s.store.GetCSVText() != "",
+		"csv_prepared": s.store.HasCSV(),
 		"template":     s.store.GetTemplate(),
 		"config":       campaignConfigToMap(s.store.GetConfig()),
 	}), nil, nil
@@ -263,7 +259,7 @@ func (s *Server) GetCurrentCampaign(ctx context.Context, req *mcp.CallToolReques
 			"failed":  prog.Failed,
 			"pending": prog.Pending,
 		},
-		"csv_prepared": s.store.GetCSVText() != "",
+		"csv_prepared": s.store.HasCSV(),
 		"template":     s.store.GetTemplate(),
 		"config":       campaignConfigToMap(s.store.GetConfig()),
 	}
@@ -527,8 +523,8 @@ func (s *Server) recipientCount(newCount int) int {
 // staged template + config, filling gaps with global defaults. When csvRequired
 // is true it errors unless a CSV has been prepared.
 func (s *Server) buildCampaignRequest(csvRequired bool) (campaign.CampaignRequest, error) {
-	csvText := s.store.GetCSVText()
-	if csvRequired && csvText == "" {
+	csvText, csvPath := s.store.GetCSVText(), s.store.GetCSVPath()
+	if csvRequired && csvText == "" && csvPath == "" {
 		return campaign.CampaignRequest{}, errors.New("no campaign prepared: call mecs_prepare_campaign with csv_text or csv_path first")
 	}
 
@@ -538,6 +534,7 @@ func (s *Server) buildCampaignRequest(csvRequired bool) (campaign.CampaignReques
 
 	req := campaign.CampaignRequest{
 		CSV:     csvText,
+		CSVPath: csvPath,
 		Subject: tmpl.Subject,
 		Body:    tmpl.Body,
 		To:      tmpl.To,

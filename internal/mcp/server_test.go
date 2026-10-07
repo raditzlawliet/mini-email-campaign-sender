@@ -105,7 +105,10 @@ func TestPrepareCampaign(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Contains(text(t, res), `"recipients": 2`)
-		assert.Equal(testCSV, st.GetCSVText())
+		// File CSVs are streamed from disk, never kept in memory as text.
+		assert.Equal(path, st.GetCSVPath())
+		assert.Empty(st.GetCSVText())
+		assert.True(st.HasCSV())
 	})
 
 	t.Run("rejects invalid csv", func(t *testing.T) {
