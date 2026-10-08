@@ -83,8 +83,9 @@ jobs:
           wails build -platform windows/amd64 -nsis -ldflags "-X main.version=${{ needs.prepare.outputs.version }}" -trimpath
 
       - name: Compress
+        shell: bash
         run: |
-          zip -9q ./build/bin/mecs-windows-x64.zip -j ./build/bin/mecs.exe
+          7z a -tzip -mx=9 ./build/bin/mecs-windows-x64.zip ./build/bin/mecs.exe
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -142,7 +143,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mecs-linux-x64
-          path: mecs-linux-x64.tar.gz
+          path: |
+            build/bin/mecs-linux-x64.tar.gz
 
   create-release:
     permissions:
