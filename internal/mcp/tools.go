@@ -131,24 +131,31 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 
 	// CSV: text, or file path (streamed from disk), or keep current staging.
 	var newRecipients *[]store.Recipient
-	var newCSV, newCSVPath *string
+	var newCSV *string
+	var newCSVFile *store.CSVFile
 	recipientCount := -1
 	if args.CSVText != "" {
 		recipients, err := campaign.ParseCSV(args.CSVText)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid CSV: %w", err)
 		}
-		empty := ""
-		newRecipients, newCSV, newCSVPath = &recipients, &args.CSVText, &empty
+		newRecipients, newCSV, newCSVFile = &recipients, &args.CSVText, &store.CSVFile{}
 		recipientCount = len(recipients)
 	} else if args.CSVPath != "" {
-		recipients, err := campaign.ParseCSVFile(args.CSVPath, 0)
+		// Validate and count by streaming; recipients are parsed again from the
+		// file at start, after verifying it is unchanged since this snapshot.
+		snap, err := campaign.SnapshotCSVFile(args.CSVPath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid csv_path %q: %w", args.CSVPath, err)
 		}
+		_, count, err := campaign.ScanCSVFile(args.CSVPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid csv_path %q: %w", args.CSVPath, err)
+		}
+		placeholders := make([]store.Recipient, count)
 		empty := ""
-		newRecipients, newCSV, newCSVPath = &recipients, &empty, &args.CSVPath
-		recipientCount = len(recipients)
+		newRecipients, newCSV, newCSVFile = &placeholders, &empty, &snap
+		recipientCount = count
 	}
 
 	// Merge template (empty values leave staging unchanged).
@@ -234,7 +241,7 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 	if args.Verbose != nil {
 		cfg.Verbose = *args.Verbose
 	}
-	if err := s.store.StageCampaign(newRecipients, newCSV, newCSVPath, &tmpl, &cfg); err != nil {
+	if err := s.store.StageCampaign(newRecipients, newCSV, newCSVFile, &tmpl, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("failed to stage campaign: %w", err)
 	}
 
@@ -523,8 +530,8 @@ func (s *Server) recipientCount(newCount int) int {
 // staged template + config, filling gaps with global defaults. When csvRequired
 // is true it errors unless a CSV has been prepared.
 func (s *Server) buildCampaignRequest(csvRequired bool) (campaign.CampaignRequest, error) {
-	csvText, csvPath := s.store.GetCSVText(), s.store.GetCSVPath()
-	if csvRequired && csvText == "" && csvPath == "" {
+	csvText, csvFile := s.store.GetCSVText(), s.store.GetCSVFile()
+	if csvRequired && csvText == "" && csvFile.Path == "" {
 		return campaign.CampaignRequest{}, errors.New("no campaign prepared: call mecs_prepare_campaign with csv_text or csv_path first")
 	}
 
@@ -534,10 +541,13 @@ func (s *Server) buildCampaignRequest(csvRequired bool) (campaign.CampaignReques
 
 	req := campaign.CampaignRequest{
 		CSV:     csvText,
-		CSVPath: csvPath,
+		CSVPath: csvFile.Path,
 		Subject: tmpl.Subject,
 		Body:    tmpl.Body,
 		To:      tmpl.To,
+	}
+	if csvFile.Path != "" {
+		req.CSVSnapshot = &csvFile
 	}
 	req.From = firstNonEmpty(stored.From, dflt.Email.From)
 	req.Provider = firstNonEmpty(stored.Provider, dflt.Email.Provider)

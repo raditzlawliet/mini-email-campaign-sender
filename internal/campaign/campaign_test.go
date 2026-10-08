@@ -127,4 +127,24 @@ func TestStreamingCSV(t *testing.T) {
 		require.Len(t, results, 2)
 		assert.Equal("Hi Bob", results[1].Subject)
 	})
+
+	t.Run("snapshot verified before reading", func(t *testing.T) {
+		assert := assert.New(t)
+		snap, err := SnapshotCSVFile(path)
+		require.NoError(t, err)
+
+		req := CampaignRequest{CSVPath: path, CSVSnapshot: &snap}
+		recipients, err := loadRecipients(req, 0)
+		require.NoError(t, err)
+		assert.Len(recipients, 3)
+
+		// Modifying the file after it was prepared must be rejected.
+		changed := filepath.Join(t.TempDir(), "changed.csv")
+		require.NoError(t, os.WriteFile(changed, []byte(csvData), 0o644))
+		snap2, err := SnapshotCSVFile(changed)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(changed, []byte(csvData+"Dan,d@x.com\n"), 0o644))
+		_, err = loadRecipients(CampaignRequest{CSVPath: changed, CSVSnapshot: &snap2}, 0)
+		assert.ErrorIs(err, ErrCSVFileChanged)
+	})
 }

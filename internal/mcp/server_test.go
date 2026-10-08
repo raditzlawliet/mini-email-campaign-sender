@@ -109,6 +109,27 @@ func TestPrepareCampaign(t *testing.T) {
 		assert.Equal(path, st.GetCSVPath())
 		assert.Empty(st.GetCSVText())
 		assert.True(st.HasCSV())
+		// Only a count is staged; recipients are re-streamed from the file at start.
+		assert.Len(st.GetRecipients(), 2)
+		assert.Equal(store.StateReady, st.GetState())
+	})
+
+	t.Run("start rejects csv file changed after prepare", func(t *testing.T) {
+		assert := assert.New(t)
+		s, st := newTestServer(t)
+
+		path := filepath.Join(t.TempDir(), "recipients.csv")
+		require.NoError(t, os.WriteFile(path, []byte(testCSV), 0644))
+		_, _, err := s.PrepareCampaign(context.Background(), &mcp.CallToolRequest{}, PrepareCampaignParams{
+			CSVPath: path, Subject: "Hi", Body: "Hello", To: "{email}", From: "from@example.com",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, os.WriteFile(path, []byte(testCSV+"carol,carol@example.com\n"), 0644))
+		_, _, err = s.StartCampaign(context.Background(), &mcp.CallToolRequest{}, struct{}{})
+		require.Error(t, err)
+		assert.Contains(err.Error(), "changed since it was prepared")
+		assert.False(st.IsRunning())
 	})
 
 	t.Run("rejects invalid csv", func(t *testing.T) {

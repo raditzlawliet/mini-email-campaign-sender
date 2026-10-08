@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,6 +25,7 @@ const csvBufferSize = 1 << 20
 type CampaignRequest struct {
 	CSV            string            `json:"csv"`
 	CSVPath        string            `json:"csv_path"` // streamed from disk when CSV is empty
+	CSVSnapshot    *store.CSVFile    `json:"-"`        // optional prepare-time file snapshot to verify before reading
 	Subject        string            `json:"subject"`
 	Body           string            `json:"body"`
 	To             string            `json:"to"`
@@ -157,10 +159,42 @@ func scanCSV(r io.Reader, limit int, emit func(store.Recipient)) ([]string, erro
 	return headers, nil
 }
 
+// ErrCSVFileChanged is returned when a prepared CSV file was modified on disk
+// after it was staged.
+var ErrCSVFileChanged = errors.New("CSV file changed since it was prepared: prepare the campaign again")
+
+// SnapshotCSVFile records the size and modification time of a CSV file so it
+// can be verified again before the file is read for sending.
+func SnapshotCSVFile(path string) (store.CSVFile, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return store.CSVFile{}, fmt.Errorf("failed to read CSV file: %w", err)
+	}
+	return store.CSVFile{Path: path, Size: info.Size(), ModTime: info.ModTime()}, nil
+}
+
+// verifyCSVSnapshot checks the file still matches its prepare-time snapshot.
+func verifyCSVSnapshot(snap store.CSVFile) error {
+	cur, err := SnapshotCSVFile(snap.Path)
+	if err != nil {
+		return err
+	}
+	if cur.Size != snap.Size || !cur.ModTime.Equal(snap.ModTime) {
+		return ErrCSVFileChanged
+	}
+	return nil
+}
+
 // loadRecipients parses recipients from the request: inline CSV text first,
-// otherwise the CSV file path (streamed from disk). limit <= 0 means all.
+// otherwise the CSV file path (streamed from disk, verified against the
+// prepare-time snapshot when one is given). limit <= 0 means all.
 func loadRecipients(req CampaignRequest, limit int) ([]store.Recipient, error) {
 	if req.CSV == "" && req.CSVPath != "" {
+		if req.CSVSnapshot != nil {
+			if err := verifyCSVSnapshot(*req.CSVSnapshot); err != nil {
+				return nil, err
+			}
+		}
 		return ParseCSVFile(req.CSVPath, limit)
 	}
 	return ParseCSVReader(strings.NewReader(req.CSV), limit)

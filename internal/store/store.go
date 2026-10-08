@@ -71,7 +71,7 @@ type Store struct {
 	template   Template
 	config     CampaignConfig
 	csvText    string
-	csvPath    string
+	csvFile    CSVFile
 	state      CampaignState
 	events     []LogEntry
 	cancelFn   context.CancelFunc
@@ -137,19 +137,35 @@ func (s *Store) GetCSVText() string {
 	return s.csvText
 }
 
+// CSVFile identifies a CSV file prepared for a campaign. Size and ModTime are
+// a snapshot taken at prepare time so a later start can detect that the file
+// changed on disk instead of silently sending to different recipients.
+type CSVFile struct {
+	Path    string
+	Size    int64
+	ModTime time.Time
+}
+
 // GetCSVPath returns the CSV file path of the prepared campaign (streamed from
 // disk, so the file content is not kept in memory). Empty for inline CSV.
 func (s *Store) GetCSVPath() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.csvPath
+	return s.csvFile.Path
+}
+
+// GetCSVFile returns the prepared CSV file path with its prepare-time snapshot.
+func (s *Store) GetCSVFile() CSVFile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.csvFile
 }
 
 // HasCSV reports whether a CSV (inline text or file path) is prepared.
 func (s *Store) HasCSV() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.csvText != "" || s.csvPath != ""
+	return s.csvText != "" || s.csvFile.Path != ""
 }
 
 // GetRevision returns a monotonically increasing counter that bumps whenever
@@ -169,7 +185,7 @@ var ErrCampaignRunning = errors.New("campaign is running")
 // never observe a partially staged campaign. Nil values keep the current
 // value; recipients non-nil also (re)initializes statuses and moves state to
 // ready. Rejected while a campaign is running.
-func (s *Store) StageCampaign(recipients *[]Recipient, csvText, csvPath *string, template *Template, config *CampaignConfig) error {
+func (s *Store) StageCampaign(recipients *[]Recipient, csvText *string, csvFile *CSVFile, template *Template, config *CampaignConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.state == StateRunning {
@@ -186,8 +202,8 @@ func (s *Store) StageCampaign(recipients *[]Recipient, csvText, csvPath *string,
 	if csvText != nil {
 		s.csvText = *csvText
 	}
-	if csvPath != nil {
-		s.csvPath = *csvPath
+	if csvFile != nil {
+		s.csvFile = *csvFile
 	}
 	if template != nil {
 		s.template = *template
@@ -373,7 +389,7 @@ func (s *Store) Reset() {
 	s.template = Template{}
 	s.config = CampaignConfig{}
 	s.csvText = ""
-	s.csvPath = ""
+	s.csvFile = CSVFile{}
 	s.events = []LogEntry{}
 	s.state = StateIdle
 	s.revision++
