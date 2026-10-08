@@ -1,6 +1,9 @@
 package campaign
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,5 +73,78 @@ func TestParseCSV(t *testing.T) {
 		assert.Len(recipients, 1)
 		assert.Equal("Alice", recipients[0].Data["name"])
 		assert.Equal("alice@example.com", recipients[0].Data["email"])
+	})
+}
+
+func TestStreamingCSV(t *testing.T) {
+	const csvData = "name,email\nAlice,a@x.com\nBob,b@x.com\nCara,c@x.com\n"
+	path := filepath.Join(t.TempDir(), "list.csv")
+	require.NoError(t, os.WriteFile(path, []byte(csvData), 0o644))
+
+	t.Run("ParseCSVFile reads all rows", func(t *testing.T) {
+		assert := assert.New(t)
+		recipients, err := ParseCSVFile(path, 0)
+		require.NoError(t, err)
+		assert.Len(recipients, 3)
+		assert.Equal("c@x.com", recipients[2].Email)
+		assert.Equal(2, recipients[2].Index)
+	})
+
+	t.Run("limit stops reading early", func(t *testing.T) {
+		assert := assert.New(t)
+		recipients, err := ParseCSVReader(strings.NewReader(csvData), 2)
+		require.NoError(t, err)
+		assert.Len(recipients, 2)
+	})
+
+	t.Run("limit ignores malformed rows after the limit", func(t *testing.T) {
+		assert := assert.New(t)
+		recipients, err := ParseCSVReader(strings.NewReader("name,email\nA,a@x.com\n\"broken"), 1)
+		require.NoError(t, err)
+		assert.Len(recipients, 1)
+	})
+
+	t.Run("ScanCSVFile returns ordered headers and count", func(t *testing.T) {
+		assert := assert.New(t)
+		headers, count, err := ScanCSVFile(path)
+		require.NoError(t, err)
+		assert.Equal([]string{"name", "email"}, headers)
+		assert.Equal(3, count)
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		assert := assert.New(t)
+		_, err := ParseCSVFile(filepath.Join(t.TempDir(), "nope.csv"), 0)
+		assert.Error(err)
+		_, _, err = ScanCSVFile(filepath.Join(t.TempDir(), "nope.csv"))
+		assert.Error(err)
+	})
+
+	t.Run("Preview streams from CSVPath", func(t *testing.T) {
+		assert := assert.New(t)
+		results, err := Preview(CampaignRequest{CSVPath: path, To: "{email}", Subject: "Hi {name}"}, 2)
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		assert.Equal("Hi Bob", results[1].Subject)
+	})
+
+	t.Run("snapshot verified before reading", func(t *testing.T) {
+		assert := assert.New(t)
+		snap, err := SnapshotCSVFile(path)
+		require.NoError(t, err)
+
+		req := CampaignRequest{CSVPath: path, CSVSnapshot: &snap}
+		recipients, err := loadRecipients(req, 0)
+		require.NoError(t, err)
+		assert.Len(recipients, 3)
+
+		// Modifying the file after it was prepared must be rejected.
+		changed := filepath.Join(t.TempDir(), "changed.csv")
+		require.NoError(t, os.WriteFile(changed, []byte(csvData), 0o644))
+		snap2, err := SnapshotCSVFile(changed)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(changed, []byte(csvData+"Dan,d@x.com\n"), 0o644))
+		_, err = loadRecipients(CampaignRequest{CSVPath: changed, CSVSnapshot: &snap2}, 0)
+		assert.ErrorIs(err, ErrCSVFileChanged)
 	})
 }

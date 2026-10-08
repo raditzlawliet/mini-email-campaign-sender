@@ -4,7 +4,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -177,6 +176,7 @@ func (a *App) GetCampaignConfig() map[string]any {
 			"template": tmpl,
 			"config":   cfg,
 			"csv_text": st.GetCSVText(),
+			"csv_path": st.GetCSVPath(),
 			"revision": st.GetRevision(),
 		},
 	}
@@ -216,9 +216,10 @@ type CampaignInput struct {
 }
 
 // buildRequest assembles a CampaignRequest from frontend input.
-func buildRequest(in CampaignInput, csv string) campaign.CampaignRequest {
+func buildRequest(in CampaignInput) campaign.CampaignRequest {
 	return campaign.CampaignRequest{
-		CSV:      csv,
+		CSV:      in.CSVText,
+		CSVPath:  in.CSVFilePath,
 		Subject:  in.Subject,
 		Body:     in.Body,
 		To:       in.To,
@@ -250,44 +251,21 @@ func buildRequest(in CampaignInput, csv string) campaign.CampaignRequest {
 	}
 }
 
-// resolveCSV returns CSV text from either manual input or a picked file path.
-func resolveCSV(in CampaignInput) (string, error) {
-	if in.CSVText != "" {
-		return in.CSVText, nil
-	}
-	if in.CSVFilePath != "" {
-		data, err := os.ReadFile(in.CSVFilePath)
-		if err != nil {
-			return "", fmt.Errorf("failed to read CSV file: %w", err)
-		}
-		return string(data), nil
-	}
-	return "", nil
-}
-
 // Preview parses CSV and renders sample emails without sending.
 func (a *App) Preview(in CampaignInput) ([]campaign.PreviewResult, error) {
-	csv, err := resolveCSV(in)
-	if err != nil {
-		return nil, err
-	}
-	if csv == "" {
+	if in.CSVText == "" && in.CSVFilePath == "" {
 		return nil, fmt.Errorf("csv data is required")
 	}
 	count := in.Count
 	if count <= 0 {
 		count = 5
 	}
-	return campaign.Preview(buildRequest(in, csv), count)
+	return campaign.Preview(buildRequest(in), count)
 }
 
 // StartCampaign parses CSV and starts the worker pool.
 func (a *App) StartCampaign(in CampaignInput) error {
-	csv, err := resolveCSV(in)
-	if err != nil {
-		return err
-	}
-	if csv == "" {
+	if in.CSVText == "" && in.CSVFilePath == "" {
 		return fmt.Errorf("csv data is required")
 	}
 	if a.store.IsRunning() {
@@ -310,7 +288,7 @@ func (a *App) StartCampaign(in CampaignInput) error {
 	}
 
 	ctx := context.Background()
-	if err := campaign.StartCampaign(ctx, dflt, a.store, buildRequest(in, csv), logger); err != nil {
+	if err := campaign.StartCampaign(ctx, dflt, a.store, buildRequest(in), logger); err != nil {
 		return err
 	}
 	return nil
@@ -414,22 +392,12 @@ func (a *App) ParseCSVFile(csvFilePath string) (map[string]any, error) {
 	if csvFilePath == "" {
 		return nil, fmt.Errorf("no CSV file selected")
 	}
-	data, err := os.ReadFile(csvFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV file: %w", err)
-	}
-	recipients, err := campaign.ParseCSV(string(data))
+	headers, count, err := campaign.ScanCSVFile(csvFilePath)
 	if err != nil {
 		return nil, err
 	}
-	headers := make([]string, 0)
-	if len(recipients) > 0 {
-		for k := range recipients[0].Data {
-			headers = append(headers, k)
-		}
-	}
 	return map[string]any{
 		"headers": headers,
-		"count":   len(recipients),
+		"count":   count,
 	}, nil
 }

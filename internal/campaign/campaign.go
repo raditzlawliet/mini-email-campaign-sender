@@ -1,10 +1,14 @@
 package campaign
 
 import (
+	"bufio"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -14,9 +18,14 @@ import (
 	"github.com/raditzlawliet/test-mass-email/internal/worker"
 )
 
+// csvBufferSize is the read buffer used when streaming CSV files from disk.
+const csvBufferSize = 1 << 20
+
 // CampaignRequest is the payload sent by the frontend for preview and start.
 type CampaignRequest struct {
 	CSV            string            `json:"csv"`
+	CSVPath        string            `json:"csv_path"` // streamed from disk when CSV is empty
+	CSVSnapshot    *store.CSVFile    `json:"-"`        // optional prepare-time file snapshot to verify before reading
 	Subject        string            `json:"subject"`
 	Body           string            `json:"body"`
 	To             string            `json:"to"`
@@ -35,62 +44,160 @@ type CampaignRequest struct {
 
 // ParseCSV parses CSV text and returns recipients.
 func ParseCSV(text string) ([]store.Recipient, error) {
-	reader := csv.NewReader(strings.NewReader(text))
-	records, err := reader.ReadAll()
+	return ParseCSVReader(strings.NewReader(text), 0)
+}
+
+// ParseCSVFile streams a CSV file from disk and returns up to limit recipients
+// (limit <= 0 means all). The file is never loaded into memory as a whole.
+func ParseCSVFile(path string, limit int) ([]store.Recipient, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CSV file: %w", err)
+	}
+	defer f.Close()
+	return ParseCSVReader(bufio.NewReaderSize(f, csvBufferSize), limit)
+}
+
+// ParseCSVReader streams CSV rows from r and returns up to limit recipients
+// (limit <= 0 means all). Only the recipients that are kept stay in memory.
+func ParseCSVReader(r io.Reader, limit int) ([]store.Recipient, error) {
+	var recipients []store.Recipient
+	_, err := scanCSV(r, limit, func(rec store.Recipient) {
+		recipients = append(recipients, rec)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if recipients == nil {
+		recipients = []store.Recipient{}
+	}
+	return recipients, nil
+}
+
+// ScanCSVFile streams a CSV file and returns its headers and valid recipient
+// count without keeping any recipient in memory.
+func ScanCSVFile(path string) (headers []string, count int, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read CSV file: %w", err)
+	}
+	defer f.Close()
+	headers, err = scanCSV(bufio.NewReaderSize(f, csvBufferSize), 0, func(store.Recipient) { count++ })
+	if err != nil {
+		return nil, 0, err
+	}
+	return headers, count, nil
+}
+
+// scanCSV reads CSV rows one at a time and calls emit for each valid
+// recipient, stopping after limit recipients (limit <= 0 means no limit).
+// It returns the trimmed header names in column order.
+func scanCSV(r io.Reader, limit int, emit func(store.Recipient)) ([]string, error) {
+	reader := csv.NewReader(r)
+	reader.ReuseRecord = true
+
+	first, err := reader.Read()
+	if err == io.EOF {
+		return nil, fmt.Errorf("CSV must have a header row and at least one data row")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("parsing CSV: %w", err)
 	}
 
-	if len(records) < 2 {
-		return nil, fmt.Errorf("CSV must have a header row and at least one data row")
-	}
-
-	headers := records[0]
+	headers := make([]string, len(first))
 	emailColIdx := -1
-	for i, h := range headers {
-		if strings.EqualFold(strings.TrimSpace(h), "email") {
+	for i, h := range first {
+		headers[i] = strings.TrimSpace(h)
+		if emailColIdx == -1 && strings.EqualFold(headers[i], "email") {
 			emailColIdx = i
-			break
 		}
 	}
 	if emailColIdx == -1 {
 		return nil, fmt.Errorf("CSV must contain an 'email' column")
 	}
 
-	recipients := make([]store.Recipient, 0, len(records)-1)
-	for rowIdx, row := range records[1:] {
+	rows, valid := 0, 0
+	for limit <= 0 || valid < limit {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parsing CSV: %w", err)
+		}
+		rows++
+
 		if len(row) < emailColIdx+1 {
-			slog.Warn("skipping row with insufficient columns", "row", rowIdx+1)
+			slog.Warn("skipping row with insufficient columns", "row", rows)
+			continue
+		}
+		emailAddr := strings.TrimSpace(row[emailColIdx])
+		if emailAddr == "" {
+			slog.Warn("skipping row with empty email", "row", rows)
 			continue
 		}
 
 		data := make(map[string]string, len(headers))
 		for colIdx, header := range headers {
 			if colIdx < len(row) {
-				data[strings.TrimSpace(header)] = row[colIdx]
+				data[header] = row[colIdx]
 			} else {
-				data[strings.TrimSpace(header)] = ""
+				data[header] = ""
 			}
 		}
 
-		emailAddr := strings.TrimSpace(row[emailColIdx])
-		if emailAddr == "" {
-			slog.Warn("skipping row with empty email", "row", rowIdx+1)
-			continue
-		}
-
-		recipients = append(recipients, store.Recipient{
-			Index: len(recipients),
-			Data:  data,
-			Email: emailAddr,
-		})
+		emit(store.Recipient{Index: valid, Data: data, Email: emailAddr})
+		valid++
 	}
 
-	if len(recipients) == 0 {
+	if rows == 0 {
+		return nil, fmt.Errorf("CSV must have a header row and at least one data row")
+	}
+	if valid == 0 {
 		return nil, fmt.Errorf("no valid recipients found in CSV")
 	}
+	return headers, nil
+}
 
-	return recipients, nil
+// ErrCSVFileChanged is returned when a prepared CSV file was modified on disk
+// after it was staged.
+var ErrCSVFileChanged = errors.New("CSV file changed since it was prepared: prepare the campaign again")
+
+// SnapshotCSVFile records the size and modification time of a CSV file so it
+// can be verified again before the file is read for sending.
+func SnapshotCSVFile(path string) (store.CSVFile, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return store.CSVFile{}, fmt.Errorf("failed to read CSV file: %w", err)
+	}
+	return store.CSVFile{Path: path, Size: info.Size(), ModTime: info.ModTime()}, nil
+}
+
+// verifyCSVSnapshot checks the file still matches its prepare-time snapshot.
+func verifyCSVSnapshot(snap store.CSVFile) error {
+	cur, err := SnapshotCSVFile(snap.Path)
+	if err != nil {
+		return err
+	}
+	if cur.Size != snap.Size || !cur.ModTime.Equal(snap.ModTime) {
+		return ErrCSVFileChanged
+	}
+	return nil
+}
+
+// loadRecipients parses recipients from the request: inline CSV text first,
+// otherwise the CSV file path (streamed from disk, verified against the
+// prepare-time snapshot when one is given). limit <= 0 means all.
+func loadRecipients(req CampaignRequest, limit int) ([]store.Recipient, error) {
+	if req.CSV == "" && req.CSVPath != "" {
+		if req.CSVSnapshot != nil {
+			if err := verifyCSVSnapshot(*req.CSVSnapshot); err != nil {
+				return nil, err
+			}
+		}
+		return ParseCSVFile(req.CSVPath, limit)
+	}
+	return ParseCSVReader(strings.NewReader(req.CSV), limit)
 }
 
 // PreviewResult is a pre-rendered email preview.
@@ -104,16 +211,16 @@ type PreviewResult struct {
 
 // Preview parses CSV text and renders sample email previews.
 func Preview(req CampaignRequest, count int) ([]PreviewResult, error) {
-	recipients, err := ParseCSV(req.CSV)
+	if count <= 0 || count > 5 {
+		count = 5
+	}
+	// Only the first rows are needed, so stop reading after count recipients.
+	recipients, err := loadRecipients(req, count)
 	if err != nil {
 		return nil, err
 	}
-
-	if count <= 0 || count > len(recipients) {
+	if count > len(recipients) {
 		count = len(recipients)
-	}
-	if count > 5 {
-		count = 5
 	}
 
 	results := make([]PreviewResult, 0, count)
@@ -133,7 +240,7 @@ func Preview(req CampaignRequest, count int) ([]PreviewResult, error) {
 
 // StartCampaign parses CSV, stores it, then runs the campaign with worker pool.
 func StartCampaign(parentCtx context.Context, defaultCfg *config.Config, st *store.Store, req CampaignRequest, logger *CampaignLogger) error {
-	recipients, err := ParseCSV(req.CSV)
+	recipients, err := loadRecipients(req, 0)
 	if err != nil {
 		return fmt.Errorf("parsing CSV: %w", err)
 	}
