@@ -113,7 +113,7 @@ func TestStore(t *testing.T) {
 		csvText := "email\na@b.c\n"
 		tmpl := Template{Subject: "S", Body: "B", To: "T"}
 		cfg := CampaignConfig{Provider: "smtp", SmtpBatchSize: 1}
-		require.NoError(st.StageCampaign(&recipients, &csvText, &tmpl, &cfg))
+		require.NoError(st.StageCampaign(&recipients, &csvText, nil, &tmpl, &cfg))
 
 		assert.Equal(StateReady, st.GetState())
 		assert.Len(st.GetRecipients(), 1)
@@ -125,7 +125,7 @@ func TestStore(t *testing.T) {
 		// Nil recipients keep existing staging untouched (config-only update),
 		// and the revision advances by exactly one again.
 		rev = st.GetRevision()
-		require.NoError(st.StageCampaign(nil, nil, &tmpl, &cfg))
+		require.NoError(st.StageCampaign(nil, nil, nil, &tmpl, &cfg))
 		assert.Len(st.GetRecipients(), 1)
 		assert.Equal(StateReady, st.GetState())
 		assert.Equal(rev+1, st.GetRevision())
@@ -139,7 +139,7 @@ func TestStore(t *testing.T) {
 		st.Reset()
 		st.StartCampaign()
 
-		err := st.StageCampaign(nil, nil, nil, nil)
+		err := st.StageCampaign(nil, nil, nil, nil, nil)
 		assert.ErrorIs(err, ErrCampaignRunning)
 	})
 }
