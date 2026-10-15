@@ -777,8 +777,21 @@
         --tg-frame: var(--tg-vermilion);
         --tg-sheet: var(--tg-vermilion-soft);
     }
+    /* --tg-frame is not inherited, so the icon takes its tone directly. */
     & .alert > svg {
-        color: var(--tg-frame, var(--tg-ink));
+        color: var(--tg-ink);
+    }
+    & .alert-info > svg {
+        color: var(--tg-sky);
+    }
+    & .alert-success > svg {
+        color: var(--tg-jade);
+    }
+    & .alert-warning > svg {
+        color: var(--tg-amber);
+    }
+    & .alert-error > svg {
+        color: var(--tg-vermilion);
     }
 }
 
