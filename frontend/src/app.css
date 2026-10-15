@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./themes/traveler-gilded.css";
 @plugin "daisyui" {
     themes: all;
 }
