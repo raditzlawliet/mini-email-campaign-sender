@@ -137,13 +137,15 @@ func (s *Store) GetCSVText() string {
 	return s.csvText
 }
 
-// CSVFile identifies a CSV file prepared for a campaign. Size and ModTime are
-// a snapshot taken at prepare time so a later start can detect that the file
-// changed on disk instead of silently sending to different recipients.
+// CSVFile identifies a CSV file prepared for a campaign. Size, ModTime and the
+// SHA-256 of the content are a snapshot taken at prepare time so a later start
+// can detect that the file changed on disk instead of silently sending to
+// different recipients.
 type CSVFile struct {
 	Path    string
 	Size    int64
 	ModTime time.Time
+	SHA256  string // hex digest of the full file content
 }
 
 // GetCSVPath returns the CSV file path of the prepared campaign (streamed from

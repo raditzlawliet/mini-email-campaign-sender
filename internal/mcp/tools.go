@@ -143,12 +143,8 @@ func (s *Server) PrepareCampaign(ctx context.Context, req *mcp.CallToolRequest, 
 		recipientCount = len(recipients)
 	} else if args.CSVPath != "" {
 		// Validate and count by streaming; recipients are parsed again from the
-		// file at start, after verifying it is unchanged since this snapshot.
-		snap, err := campaign.SnapshotCSVFile(args.CSVPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid csv_path %q: %w", args.CSVPath, err)
-		}
-		_, count, err := campaign.ScanCSVFile(args.CSVPath)
+		// file at start, after verifying it is unchanged (content hash) since this snapshot.
+		_, count, snap, err := campaign.ScanCSVFileSnapshot(args.CSVPath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid csv_path %q: %w", args.CSVPath, err)
 		}

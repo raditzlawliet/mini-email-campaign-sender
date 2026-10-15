@@ -130,8 +130,9 @@ func TestStreamingCSV(t *testing.T) {
 
 	t.Run("snapshot verified before reading", func(t *testing.T) {
 		assert := assert.New(t)
-		snap, err := SnapshotCSVFile(path)
+		_, _, snap, err := ScanCSVFileSnapshot(path)
 		require.NoError(t, err)
+		assert.Len(snap.SHA256, 64)
 
 		req := CampaignRequest{CSVPath: path, CSVSnapshot: &snap}
 		recipients, err := loadRecipients(req, 0)
@@ -141,10 +142,26 @@ func TestStreamingCSV(t *testing.T) {
 		// Modifying the file after it was prepared must be rejected.
 		changed := filepath.Join(t.TempDir(), "changed.csv")
 		require.NoError(t, os.WriteFile(changed, []byte(csvData), 0o644))
-		snap2, err := SnapshotCSVFile(changed)
+		_, _, snap2, err := ScanCSVFileSnapshot(changed)
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(changed, []byte(csvData+"Dan,d@x.com\n"), 0o644))
 		_, err = loadRecipients(CampaignRequest{CSVPath: changed, CSVSnapshot: &snap2}, 0)
+		assert.ErrorIs(err, ErrCSVFileChanged)
+	})
+
+	t.Run("same size and mtime but different content is rejected", func(t *testing.T) {
+		assert := assert.New(t)
+		p := filepath.Join(t.TempDir(), "same.csv")
+		require.NoError(t, os.WriteFile(p, []byte(csvData), 0o644))
+		_, _, snap, err := ScanCSVFileSnapshot(p)
+		require.NoError(t, err)
+
+		// Swap one recipient address for another of identical length and put
+		// the original modification time back.
+		require.NoError(t, os.WriteFile(p, []byte(strings.Replace(csvData, "c@x.com", "z@x.com", 1)), 0o644))
+		require.NoError(t, os.Chtimes(p, snap.ModTime, snap.ModTime))
+
+		_, err = loadRecipients(CampaignRequest{CSVPath: p, CSVSnapshot: &snap}, 0)
 		assert.ErrorIs(err, ErrCSVFileChanged)
 	})
 }

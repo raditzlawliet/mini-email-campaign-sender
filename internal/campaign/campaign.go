@@ -3,7 +3,9 @@ package campaign
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -77,16 +79,31 @@ func ParseCSVReader(r io.Reader, limit int) ([]store.Recipient, error) {
 // ScanCSVFile streams a CSV file and returns its headers and valid recipient
 // count without keeping any recipient in memory.
 func ScanCSVFile(path string) (headers []string, count int, err error) {
+	headers, count, _, err = ScanCSVFileSnapshot(path)
+	return headers, count, err
+}
+
+// ScanCSVFileSnapshot is ScanCSVFile that also returns a snapshot of the exact
+// file that was read (size, modification time and SHA-256 of the content). The
+// file is opened once, so the snapshot always describes the scanned bytes.
+func ScanCSVFileSnapshot(path string) (headers []string, count int, snap store.CSVFile, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read CSV file: %w", err)
+		return nil, 0, snap, fmt.Errorf("failed to read CSV file: %w", err)
 	}
 	defer f.Close()
-	headers, err = scanCSV(bufio.NewReaderSize(f, csvBufferSize), 0, func(store.Recipient) { count++ })
+	info, err := f.Stat()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, snap, fmt.Errorf("failed to read CSV file: %w", err)
 	}
-	return headers, count, nil
+
+	h := sha256.New()
+	headers, err = scanCSV(bufio.NewReaderSize(io.TeeReader(f, h), csvBufferSize), 0, func(store.Recipient) { count++ })
+	if err != nil {
+		return nil, 0, snap, err
+	}
+	snap = store.CSVFile{Path: path, Size: info.Size(), ModTime: info.ModTime(), SHA256: hex.EncodeToString(h.Sum(nil))}
+	return headers, count, snap, nil
 }
 
 // scanCSV reads CSV rows one at a time and calls emit for each valid
@@ -163,26 +180,34 @@ func scanCSV(r io.Reader, limit int, emit func(store.Recipient)) ([]string, erro
 // after it was staged.
 var ErrCSVFileChanged = errors.New("CSV file changed since it was prepared: prepare the campaign again")
 
-// SnapshotCSVFile records the size and modification time of a CSV file so it
-// can be verified again before the file is read for sending.
-func SnapshotCSVFile(path string) (store.CSVFile, error) {
-	info, err := os.Stat(path)
+// parseCSVFileVerified opens the prepared file once and parses it from that
+// same handle, so the file checked is the file read. Size and modification time
+// are checked first; for a full read the SHA-256 of the bytes actually parsed
+// must also match the prepare-time snapshot. Partial reads (limit > 0, used by
+// previews) only get the cheap check since the whole content is not read.
+func parseCSVFileVerified(snap store.CSVFile, limit int) ([]store.Recipient, error) {
+	f, err := os.Open(snap.Path)
 	if err != nil {
-		return store.CSVFile{}, fmt.Errorf("failed to read CSV file: %w", err)
+		return nil, fmt.Errorf("failed to read CSV file: %w", err)
 	}
-	return store.CSVFile{Path: path, Size: info.Size(), ModTime: info.ModTime()}, nil
-}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CSV file: %w", err)
+	}
+	if info.Size() != snap.Size || !info.ModTime().Equal(snap.ModTime) {
+		return nil, ErrCSVFileChanged
+	}
 
-// verifyCSVSnapshot checks the file still matches its prepare-time snapshot.
-func verifyCSVSnapshot(snap store.CSVFile) error {
-	cur, err := SnapshotCSVFile(snap.Path)
+	h := sha256.New()
+	recipients, err := ParseCSVReader(bufio.NewReaderSize(io.TeeReader(f, h), csvBufferSize), limit)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if cur.Size != snap.Size || !cur.ModTime.Equal(snap.ModTime) {
-		return ErrCSVFileChanged
+	if limit <= 0 && hex.EncodeToString(h.Sum(nil)) != snap.SHA256 {
+		return nil, ErrCSVFileChanged
 	}
-	return nil
+	return recipients, nil
 }
 
 // loadRecipients parses recipients from the request: inline CSV text first,
@@ -191,9 +216,7 @@ func verifyCSVSnapshot(snap store.CSVFile) error {
 func loadRecipients(req CampaignRequest, limit int) ([]store.Recipient, error) {
 	if req.CSV == "" && req.CSVPath != "" {
 		if req.CSVSnapshot != nil {
-			if err := verifyCSVSnapshot(*req.CSVSnapshot); err != nil {
-				return nil, err
-			}
+			return parseCSVFileVerified(*req.CSVSnapshot, limit)
 		}
 		return ParseCSVFile(req.CSVPath, limit)
 	}
