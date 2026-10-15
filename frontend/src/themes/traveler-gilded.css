@@ -58,8 +58,8 @@
     font-display: swap;
 }
 @font-face {
-    font-family: "VT323";
-    src: url("../assets/fonts/VT323-Regular.woff2") format("woff2");
+    font-family: "Departure Mono";
+    src: url("../assets/fonts/DepartureMono-Regular.woff2") format("woff2");
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -308,7 +308,7 @@
     --tg-font-display: "Pixelify Sans", ui-monospace, "Courier New", monospace;
     --tg-font-text: "Pixelify Sans", ui-monospace, "Courier New", monospace;
     --tg-font-label: "Silkscreen", "Pixelify Sans", ui-monospace, monospace;
-    --tg-font-code: "VT323", ui-monospace, "Courier New", monospace;
+    --tg-font-code: "Departure Mono", ui-monospace, "Courier New", monospace;
     --tg-label-weight: 400;
     --tg-label-track: 0.02em;
 }
@@ -718,13 +718,6 @@
         letter-spacing: 0;
         text-transform: none;
     }
-}
-
-/* VT323 is drawn small for its size; scale it up to the design system's
-   pixel code size without touching the markup's text-* steps. Specificity
-   matches code.badge above, which resets it through the font shorthand. */
-[data-theme^="traveler-gilded-pixel"] :is(.font-mono, .mockup-code, code, code.badge) {
-    font-size-adjust: ex-height 0.62;
 }
 
 /* Tabs: a 2px rule under the bar; the current tab is a gold fill. */
