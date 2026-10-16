@@ -332,8 +332,7 @@
     & .text-base-content\/50,
     & .text-base-content\/60,
     & .text-base-content\/70,
-    & .fieldset-label,
-    & .label {
+    & .fieldset-label {
         color: var(--tg-ink-muted);
     }
 
@@ -957,6 +956,192 @@
     }
     & .app-titlebar .dropdown-content :focus-visible {
         outline-color: var(--tg-focus);
+    }
+}
+
+/* Type scale. Tailwind's size steps are remapped so the markup's text-*
+   classes land on the system's styles: nothing below 14px except capital
+   labels, text-lg is subheading. */
+
+[data-theme^="traveler-gilded"] {
+    --text-xs: 14px; /* small */
+    --text-xs--line-height: 20px;
+    --text-sm: 14px; /* small */
+    --text-sm--line-height: 20px;
+    --text-base: 16px; /* body */
+    --text-base--line-height: 24px;
+    --text-lg: 20px; /* subheading */
+    --text-lg--line-height: 24px;
+
+    /* Field text is body (16px); a text-sm utility on a code field keeps 14px. */
+    & :is(.input, .select, .textarea) {
+        --font-size-min: 16px;
+    }
+    /* DaisyUI sets 12px on the whole fieldset. */
+    & .fieldset {
+        font-size: 14px;
+        line-height: 20px;
+    }
+    /* Field labels are control: 16px semi-bold ink. */
+    & .label {
+        color: var(--tg-ink);
+        font: 600 16px/24px var(--tg-font-display);
+    }
+    & .card-title {
+        font-size: 20px;
+        line-height: 24px;
+    }
+    /* Dialog titles are heading. */
+    & .modal-box :is(h1, h2, h3) {
+        font-family: var(--tg-font-display);
+        font-size: 24px;
+        line-height: 28px;
+        font-weight: 700;
+    }
+    /* Stat values are stat: 32px bold. */
+    & .stat-value {
+        font-size: 32px;
+        line-height: 36px;
+    }
+    /* Language codes in the language menu are capital labels. */
+    & .text-\[\.5625rem\] {
+        font: var(--tg-label-weight) 12px/16px var(--tg-font-label);
+        letter-spacing: var(--tg-label-track);
+        text-transform: uppercase;
+    }
+    /* Native language names stay in the theme face, never a smooth one in pixel mode. */
+    & .font-\[sans-serif\] {
+        font-family: inherit;
+    }
+
+    /* Buttons: 40px (16px label), sm 28px (14px label). */
+    & .btn {
+        --fontsize: 16px;
+    }
+    & .btn-sm {
+        --size: 28px;
+        --fontsize: 14px;
+    }
+    & .btn-xs {
+        --fontsize: 14px;
+    }
+}
+
+/* Nothing is translucent: faded text becomes a flat muted colour, faded
+   fills become flat fills. */
+
+[data-theme^="traveler-gilded"] {
+    & :is(.opacity-40, .opacity-60, .opacity-70) {
+        opacity: 1;
+        color: var(--tg-ink-muted);
+    }
+    & .app-titlebar .btn:is(.opacity-40, .opacity-60, .opacity-70) {
+        color: var(--tg-on-slate-muted);
+    }
+    & .app-titlebar .w-px.bg-base-content\/10 {
+        width: 2px;
+        background-color: var(--tg-on-slate-muted);
+    }
+    & .app-titlebar .hover\:bg-base-content\/10:hover {
+        background-color: transparent;
+        color: var(--tg-gold-bright);
+    }
+    & .menu :is(.menu-disabled, [disabled]) {
+        color: var(--tg-ink-disabled);
+    }
+}
+
+/* Motion: things appear in one step, never fade or ease in. */
+
+[data-theme^="traveler-gilded"] {
+    & .modal,
+    & .modal-box,
+    & .dropdown .dropdown-content,
+    & .menu li > *,
+    & .transition-colors {
+        transition: none;
+        animation: none;
+    }
+    & .modal:is(.modal-open, [open], :target) > .modal-box {
+        opacity: 1;
+        scale: 1;
+        translate: 0;
+    }
+}
+
+/* Icons: the pixel set replaces the smooth one. */
+
+[data-theme^="traveler-gilded"] {
+    & .app-icon-smooth {
+        display: none;
+    }
+    & .app-icon-pixel {
+        display: inline-block;
+        flex: none;
+        vertical-align: middle;
+    }
+}
+
+/* Status icons on the slate title bar take the light (Night) hues, which
+   are drawn for dark grounds; neutral becomes on-slate-muted. */
+[data-theme^="traveler-gilded"] .app-titlebar .app-icon-pixel {
+    &.text-success {
+        color: #86d396;
+    }
+    &.text-error {
+        color: #f29076;
+    }
+    &.text-warning {
+        color: #ecbd4f;
+    }
+    &.text-neutral {
+        color: var(--tg-on-slate-muted);
+    }
+}
+
+/* Tooltip: a slate bubble on the pixel edge with a hard float shadow, and a
+   stepped arrow (8px then 4px rows) pointing at the element. */
+
+[data-theme^="traveler-gilded"] .app-tooltip {
+    border-radius: 0;
+    padding: 4px 8px;
+    background-color: var(--tg-slate);
+    color: var(--tg-on-slate);
+    font: 400 14px/20px var(--tg-font-text);
+    box-shadow:
+        0 -2px 0 0 var(--tg-outline),
+        0 2px 0 0 var(--tg-outline),
+        -2px 0 0 0 var(--tg-outline),
+        2px 0 0 0 var(--tg-outline),
+        4px 4px 0 0 var(--tg-shadow);
+
+    &::before,
+    &::after {
+        content: "";
+        position: absolute;
+        left: var(--arrow-x, 50%);
+        height: 2px;
+        background: var(--tg-outline);
+    }
+    &::before {
+        width: 8px;
+        margin-left: -4px;
+    }
+    &::after {
+        width: 4px;
+        margin-left: -2px;
+    }
+    &[data-placement="top"]::before {
+        top: calc(100% + 2px);
+    }
+    &[data-placement="top"]::after {
+        top: calc(100% + 4px);
+    }
+    &[data-placement="bottom"]::before {
+        bottom: calc(100% + 2px);
+    }
+    &[data-placement="bottom"]::after {
+        bottom: calc(100% + 4px);
     }
 }
 

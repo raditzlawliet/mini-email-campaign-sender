@@ -1,4 +1,5 @@
 <script>
+    import Icon from "./Icon.svelte";
     import InputData from "./InputData.svelte";
     import EmailTemplate from "./EmailTemplate.svelte";
     import ProviderConfig from "./ProviderConfig.svelte";
@@ -554,7 +555,7 @@
 <div class="space-y-6">
     {#if error}
         <div role="alert" class="alert alert-error alert-soft">
-            <CircleXIcon class="w-4 h-4"></CircleXIcon>
+            <Icon pixel="warning" smooth={CircleXIcon} class="w-4 h-4" />
             <span>{error}</span>
             <button class="btn btn-ghost btn-sm" onclick={() => (error = "")}
                 >{t("dismiss")}</button
@@ -693,7 +694,7 @@
                             onclick={handlePause}
                             disabled={saving}
                         >
-                            <PauseIcon class="w-4 h-4"></PauseIcon>
+                            <Icon pixel="pause" smooth={PauseIcon} class="w-4 h-4" />
                             {t("pause")}
                         </button>
                     {:else if progress.state === "paused"}
@@ -702,7 +703,7 @@
                             onclick={handleResume}
                             disabled={saving}
                         >
-                            <PlayIcon class="w-4 h-4"></PlayIcon>
+                            <Icon pixel="play" smooth={PlayIcon} class="w-4 h-4" />
                             {t("resume")}
                         </button>
                     {/if}
@@ -716,7 +717,7 @@
                         {#if campaignRunning}<span
                                 class="loading loading-spinner loading-xs"
                             ></span>{/if}
-                        <PlayIcon class="w-4 h-4"></PlayIcon>
+                        <Icon pixel="play" smooth={PlayIcon} class="w-4 h-4" />
                         {t("start_campaign")}
                     </button>
                     <button
@@ -802,9 +803,9 @@
                         <span>{t("campaign_log")} ({logEvents.length})</span>
                         <span class="text-xs">
                             {#if logOpen}
-                                <ChevronDown class="w-4 h-4" />
+                                <Icon pixel="chevron-down" smooth={ChevronDown} size={12} class="w-4 h-4" />
                             {:else}
-                                <ChevronRight class="w-4 h-4" />
+                                <Icon pixel="chevron-right" smooth={ChevronRight} size={12} class="w-4 h-4" />
                             {/if}
                         </span>
                     </button>

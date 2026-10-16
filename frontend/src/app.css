@@ -4,6 +4,27 @@
     themes: all;
 }
 
+/* Icon.svelte renders a smooth and a pixel icon; stock themes show the
+   smooth one, themes/traveler-gilded.css swaps them. */
+.app-icon-pixel {
+    display: none;
+}
+
+/* Tooltip bubble from lib/tooltip.js (use:tooltip), styled from the active
+   DaisyUI theme. Mounted on <body>, positioned by the action. */
+.app-tooltip {
+    position: fixed;
+    z-index: 1000;
+    max-width: 18rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-field);
+    background-color: var(--color-neutral);
+    color: var(--color-neutral-content);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    pointer-events: none;
+}
+
 /* Wails v2.13 detects draggable regions via the --wails-draggable CSS
    custom property (inherited by children), not the attribute itself. */
 [data-wails-drag] {
