@@ -1,0 +1,1160 @@
+/* Traveler Gilded: DaisyUI themes ported from the "Traveler Gilded Pixel"
+   design system. Four themes:
+   - traveler-gilded-day, traveler-gilded-night (smooth text)
+   - traveler-gilded-pixel-day, traveler-gilded-pixel-night (pixel text)
+
+   Everything is drawn on a 2px grid: no curves, no blur, no translucency.
+   Control edges are four hard box-shadows (one-pixel notched corners),
+   panels are flat background layers (two-step stair corners) with a hard
+   float shadow, and raised buttons stand on a solid drop.
+
+   Every rule below is scoped to [data-theme^="traveler-gilded"], so the
+   stock DaisyUI themes are untouched. The rules are unlayered on purpose so
+   they win over DaisyUI's component layer; they avoid setting spacing and
+   sizing so Tailwind utilities in the markup keep working. */
+
+/* Fonts */
+
+@font-face {
+    font-family: "Atkinson Hyperlegible Next";
+    src: url("../assets/fonts/AtkinsonHyperlegibleNext-Variable.woff2") format("woff2");
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Atkinson Hyperlegible Next";
+    src: url("../assets/fonts/AtkinsonHyperlegibleNext-Italic-Variable.woff2") format("woff2");
+    font-weight: 200 800;
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Cascadia Mono";
+    src: url("../assets/fonts/CascadiaMono-Variable.woff2") format("woff2");
+    font-weight: 200 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Pixelify Sans";
+    src: url("../assets/fonts/PixelifySans-Variable.woff2") format("woff2");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Silkscreen";
+    src: url("../assets/fonts/Silkscreen-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Silkscreen";
+    src: url("../assets/fonts/Silkscreen-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Departure Mono";
+    src: url("../assets/fonts/DepartureMono-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* DaisyUI themes. Radii are 0: corners are drawn as notches, never curves. */
+
+@plugin "daisyui/theme" {
+    name: "traveler-gilded-day";
+    default: false;
+    prefersdark: false;
+    color-scheme: light;
+    --color-base-100: #f7f2e8; /* surface-raised */
+    --color-base-200: #ece5d8; /* surface */
+    --color-base-300: #dcd2be; /* surface-sunken */
+    --color-base-content: #2b3142; /* ink */
+    --color-primary: #d3bc8e; /* gold */
+    --color-primary-content: #2b3142; /* on-gold */
+    --color-secondary: #3b4255; /* slate */
+    --color-secondary-content: #ece5d8; /* on-slate */
+    --color-accent: #146a5a; /* teal */
+    --color-accent-content: #f7f2e8; /* on-status */
+    --color-neutral: #3b4255; /* slate */
+    --color-neutral-content: #ece5d8; /* on-slate */
+    --color-info: #22629b; /* sky */
+    --color-info-content: #f7f2e8;
+    --color-success: #256b3a; /* jade */
+    --color-success-content: #f7f2e8;
+    --color-warning: #7d5200; /* amber */
+    --color-warning-content: #f7f2e8;
+    --color-error: #a63a26; /* vermilion */
+    --color-error-content: #f7f2e8;
+    --radius-selector: 0rem;
+    --radius-field: 0rem;
+    --radius-box: 0rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px; /* pixel */
+    --depth: 0;
+    --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+    name: "traveler-gilded-night";
+    default: false;
+    prefersdark: false;
+    color-scheme: dark;
+    --color-base-100: #2b3142; /* surface-raised */
+    --color-base-200: #1f2433; /* surface */
+    --color-base-300: #171b27; /* surface-sunken */
+    --color-base-content: #ece5d8; /* ink */
+    --color-primary: #d3bc8e; /* gold */
+    --color-primary-content: #2b3142; /* on-gold */
+    --color-secondary: #3b4255; /* slate */
+    --color-secondary-content: #ece5d8; /* on-slate */
+    --color-accent: #63cdb0; /* teal */
+    --color-accent-content: #171b27; /* on-status */
+    --color-neutral: #3b4255; /* slate */
+    --color-neutral-content: #ece5d8; /* on-slate */
+    --color-info: #77bbea; /* sky */
+    --color-info-content: #171b27;
+    --color-success: #86d396; /* jade */
+    --color-success-content: #171b27;
+    --color-warning: #ecbd4f; /* amber */
+    --color-warning-content: #171b27;
+    --color-error: #f29076; /* vermilion */
+    --color-error-content: #171b27;
+    --radius-selector: 0rem;
+    --radius-field: 0rem;
+    --radius-box: 0rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px;
+    --depth: 0;
+    --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+    name: "traveler-gilded-pixel-day";
+    default: false;
+    prefersdark: false;
+    color-scheme: light;
+    --color-base-100: #f7f2e8;
+    --color-base-200: #ece5d8;
+    --color-base-300: #dcd2be;
+    --color-base-content: #2b3142;
+    --color-primary: #d3bc8e;
+    --color-primary-content: #2b3142;
+    --color-secondary: #3b4255;
+    --color-secondary-content: #ece5d8;
+    --color-accent: #146a5a;
+    --color-accent-content: #f7f2e8;
+    --color-neutral: #3b4255;
+    --color-neutral-content: #ece5d8;
+    --color-info: #22629b;
+    --color-info-content: #f7f2e8;
+    --color-success: #256b3a;
+    --color-success-content: #f7f2e8;
+    --color-warning: #7d5200;
+    --color-warning-content: #f7f2e8;
+    --color-error: #a63a26;
+    --color-error-content: #f7f2e8;
+    --radius-selector: 0rem;
+    --radius-field: 0rem;
+    --radius-box: 0rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px;
+    --depth: 0;
+    --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+    name: "traveler-gilded-pixel-night";
+    default: false;
+    prefersdark: false;
+    color-scheme: dark;
+    --color-base-100: #2b3142;
+    --color-base-200: #1f2433;
+    --color-base-300: #171b27;
+    --color-base-content: #ece5d8;
+    --color-primary: #d3bc8e;
+    --color-primary-content: #2b3142;
+    --color-secondary: #3b4255;
+    --color-secondary-content: #ece5d8;
+    --color-accent: #63cdb0;
+    --color-accent-content: #171b27;
+    --color-neutral: #3b4255;
+    --color-neutral-content: #ece5d8;
+    --color-info: #77bbea;
+    --color-info-content: #171b27;
+    --color-success: #86d396;
+    --color-success-content: #171b27;
+    --color-warning: #ecbd4f;
+    --color-warning-content: #171b27;
+    --color-error: #f29076;
+    --color-error-content: #171b27;
+    --radius-selector: 0rem;
+    --radius-field: 0rem;
+    --radius-box: 0rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px;
+    --depth: 0;
+    --noise: 0;
+}
+
+/* Per-element knobs. Not inherited, so a toned alert never leaks its edge
+   colour into the buttons inside it. Unset means the fallback in var(). */
+@property --tg-edge { syntax: "*"; inherits: false; }
+@property --tg-hi { syntax: "*"; inherits: false; }
+@property --tg-lo { syntax: "*"; inherits: false; }
+@property --tg-lift { syntax: "*"; inherits: false; }
+@property --tg-drop { syntax: "*"; inherits: false; }
+@property --tg-fill { syntax: "*"; inherits: false; }
+@property --tg-fg { syntax: "*"; inherits: false; }
+@property --tg-frame { syntax: "*"; inherits: false; }
+@property --tg-sheet { syntax: "*"; inherits: false; }
+
+/* Tokens */
+
+[data-theme^="traveler-gilded"] {
+    --tg-surface: #ece5d8;
+    --tg-surface-raised: #f7f2e8;
+    --tg-surface-sunken: #dcd2be;
+    --tg-surface-code: #cfc09d;
+    --tg-slate: #3b4255;
+    --tg-outline: #3b4255;
+    --tg-shadow: #3b4255;
+    --tg-line: #c4b69b;
+    --tg-ink: #2b3142;
+    --tg-ink-muted: #565c6e;
+    --tg-ink-disabled: #a39a86;
+    --tg-on-slate: #ece5d8;
+    --tg-on-slate-muted: #bcb6aa;
+    --tg-gold: #d3bc8e;
+    --tg-gold-bright: #f6cf57;
+    --tg-gold-shade: #a58b56;
+    --tg-gold-ink: #6f531b;
+    --tg-on-gold: #2b3142;
+    --tg-jade: #256b3a;
+    --tg-jade-soft: #cee5d2;
+    --tg-teal: #146a5a;
+    --tg-teal-soft: #cde4d9;
+    --tg-sky: #22629b;
+    --tg-sky-soft: #cddeed;
+    --tg-amber: #7d5200;
+    --tg-amber-soft: #f2deab;
+    --tg-vermilion: #a63a26;
+    --tg-vermilion-soft: #f1d2c7;
+    --tg-on-status: #f7f2e8;
+    --tg-focus: #22629b;
+    --tg-chevron: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 6%22 shape-rendering=%22crispEdges%22 fill=%22%232b3142%22%3E%3Crect width=%222%22 height=%222%22/%3E%3Crect x=%228%22 width=%222%22 height=%222%22/%3E%3Crect x=%222%22 y=%222%22 width=%222%22 height=%222%22/%3E%3Crect x=%226%22 y=%222%22 width=%222%22 height=%222%22/%3E%3Crect x=%224%22 y=%224%22 width=%222%22 height=%222%22/%3E%3C/svg%3E");
+
+    --tg-font-display: "Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif;
+    --tg-font-text: "Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif;
+    --tg-font-label: "Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif;
+    --tg-font-code: "Cascadia Mono", "Cascadia Code", Consolas, Menlo, ui-monospace, monospace;
+    --tg-label-weight: 700;
+    --tg-label-track: 0.06em;
+
+    /* Tailwind's rounded-* scale follows the no-curves rule too. */
+    --radius-xs: 0px;
+    --radius-sm: 0px;
+    --radius-md: 0px;
+    --radius-lg: 0px;
+    --radius-xl: 0px;
+    --radius-2xl: 0px;
+    --radius-3xl: 0px;
+    --radius-4xl: 0px;
+
+    --font-mono: var(--tg-font-code);
+    font-family: var(--tg-font-text);
+    scrollbar-color: var(--tg-outline) var(--tg-surface-sunken);
+}
+
+[data-theme^="traveler-gilded"][data-theme$="-night"] {
+    --tg-surface: #1f2433;
+    --tg-surface-raised: #2b3142;
+    --tg-surface-sunken: #171b27;
+    --tg-surface-code: #4a5470;
+    --tg-outline: #d3bc8e;
+    --tg-shadow: #0d1018;
+    --tg-line: #3d4459;
+    --tg-ink: #ece5d8;
+    --tg-ink-muted: #b3ad9f;
+    --tg-ink-disabled: #6c7389;
+    --tg-gold-ink: #e6d3a3;
+    --tg-jade: #86d396;
+    --tg-jade-soft: #263b2a;
+    --tg-teal: #63cdb0;
+    --tg-teal-soft: #1c3b38;
+    --tg-sky: #77bbea;
+    --tg-sky-soft: #1e3450;
+    --tg-amber: #ecbd4f;
+    --tg-amber-soft: #43361a;
+    --tg-vermilion: #f29076;
+    --tg-vermilion-soft: #4a2622;
+    --tg-on-status: #171b27;
+    --tg-focus: #77bbea;
+    --tg-chevron: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 6%22 shape-rendering=%22crispEdges%22 fill=%22%23ece5d8%22%3E%3Crect width=%222%22 height=%222%22/%3E%3Crect x=%228%22 width=%222%22 height=%222%22/%3E%3Crect x=%222%22 y=%222%22 width=%222%22 height=%222%22/%3E%3Crect x=%226%22 y=%222%22 width=%222%22 height=%222%22/%3E%3Crect x=%224%22 y=%224%22 width=%222%22 height=%222%22/%3E%3C/svg%3E");
+}
+
+/* Pixel text mode: every word pixel, never mixed with the smooth faces. */
+[data-theme^="traveler-gilded-pixel"] {
+    --tg-font-display: "Pixelify Sans", ui-monospace, "Courier New", monospace;
+    --tg-font-text: "Pixelify Sans", ui-monospace, "Courier New", monospace;
+    --tg-font-label: "Silkscreen", "Pixelify Sans", ui-monospace, monospace;
+    --tg-font-code: "Departure Mono", ui-monospace, "Courier New", monospace;
+    --tg-label-weight: 400;
+    --tg-label-track: 0.02em;
+}
+
+/* Base */
+
+[data-theme^="traveler-gilded"] {
+    & ::selection {
+        background-color: var(--tg-gold);
+        color: var(--tg-on-gold);
+    }
+
+    /* Focus: a solid square 2px outline, clear of the edge. */
+    & :focus-visible {
+        outline: 2px solid var(--tg-focus);
+        outline-offset: 4px;
+    }
+
+    /* Secondary text is a flat colour, never a faded one. */
+    & .text-base-content\/40,
+    & .text-base-content\/50,
+    & .text-base-content\/60,
+    & .text-base-content\/70,
+    & .fieldset-label {
+        color: var(--tg-ink-muted);
+    }
+
+    /* Gold is a fill; as text it is gold-ink. */
+    & .text-primary,
+    & .link {
+        color: var(--tg-gold-ink);
+    }
+
+    & .rounded-full {
+        border-radius: 0;
+    }
+    & .border {
+        border-width: 2px;
+    }
+
+    & .card-title {
+        font-family: var(--tg-font-display);
+        font-weight: 700;
+    }
+
+    & ::-webkit-scrollbar {
+        width: 16px;
+        height: 16px;
+    }
+    & ::-webkit-scrollbar-track,
+    & ::-webkit-scrollbar-corner {
+        background: var(--tg-surface-sunken);
+    }
+    & ::-webkit-scrollbar-thumb {
+        min-width: 24px;
+        min-height: 24px;
+        background: var(--tg-outline);
+        background-clip: padding-box;
+        border: 2px solid var(--tg-surface-sunken);
+        border-radius: 0;
+    }
+}
+
+/* The pixel edge: four hard shadows draw a 2px border with one-pixel
+   notched corners, plus a hard drop when --tg-lift is set. The edge sits
+   outside the box, so it never changes layout. */
+
+[data-theme^="traveler-gilded"]
+    :is(
+        .btn:not(.btn-ghost, .btn-link),
+        .input,
+        .select,
+        .textarea,
+        .checkbox,
+        .toggle,
+        .badge:not(code),
+        .progress,
+        .tabs > .tab:is(.tab-active, [aria-selected="true"]),
+        .mockup-code
+    ) {
+    border: 0;
+    border-radius: 0;
+    box-shadow:
+        inset 0 2px 0 0 var(--tg-hi, transparent),
+        inset 0 -2px 0 0 var(--tg-lo, transparent),
+        0 -2px 0 0 var(--tg-edge, var(--tg-outline)),
+        0 2px 0 0 var(--tg-edge, var(--tg-outline)),
+        -2px 0 0 0 var(--tg-edge, var(--tg-outline)),
+        2px 0 0 0 var(--tg-edge, var(--tg-outline)),
+        0 calc(2px + var(--tg-lift, 0px)) 0 0 var(--tg-drop, transparent),
+        -2px var(--tg-lift, 0px) 0 0 var(--tg-drop, transparent),
+        2px var(--tg-lift, 0px) 0 0 var(--tg-drop, transparent);
+}
+
+/* Hard shadows: depth is an offset, never a glow. */
+[data-theme^="traveler-gilded"] {
+    & .shadow-sm,
+    & .shadow {
+        box-shadow: 0 2px 0 0 var(--tg-shadow);
+    }
+    & .shadow-2xl {
+        box-shadow: 4px 4px 0 0 var(--tg-shadow);
+    }
+}
+
+/* Panels: a 2px frame with two-step stair corners around a flat sheet, and
+   a hard float shadow down and to the right that follows the stair. Drawn
+   as background layers, so scrolling panels keep their frame. */
+
+[data-theme^="traveler-gilded"]
+    :is(
+        .card.bg-base-100,
+        .card-body.bg-base-100,
+        .modal-box,
+        .dropdown-content,
+        .stats,
+        .alert
+    ) {
+    border: 0;
+    border-radius: 0;
+    background:
+        linear-gradient(var(--tg-sheet, var(--tg-surface-raised)), var(--tg-sheet, var(--tg-surface-raised))) 4px 2px / calc(100% - 8px) calc(100% - 4px) no-repeat,
+        linear-gradient(var(--tg-sheet, var(--tg-surface-raised)), var(--tg-sheet, var(--tg-surface-raised))) 2px 4px / calc(100% - 4px) calc(100% - 8px) no-repeat,
+        linear-gradient(var(--tg-frame, var(--tg-outline)), var(--tg-frame, var(--tg-outline))) 4px 0 / calc(100% - 8px) 100% no-repeat,
+        linear-gradient(var(--tg-frame, var(--tg-outline)), var(--tg-frame, var(--tg-outline))) 2px 2px / calc(100% - 4px) calc(100% - 4px) no-repeat,
+        linear-gradient(var(--tg-frame, var(--tg-outline)), var(--tg-frame, var(--tg-outline))) 0 4px / 100% calc(100% - 8px) no-repeat;
+}
+
+/* Callouts (alerts) sit flat; everything else that floats casts the shadow. */
+[data-theme^="traveler-gilded"]
+    :is(
+        .card.bg-base-100,
+        .card-body.bg-base-100,
+        .modal-box,
+        .dropdown-content,
+        .stats,
+        .toast .alert
+    ) {
+    box-shadow:
+        4px 4px 0 -2px var(--tg-shadow),
+        4px 8px 0 -4px var(--tg-shadow),
+        8px 4px 0 -4px var(--tg-shadow);
+}
+
+/* Buttons */
+
+[data-theme^="traveler-gilded"] {
+    & .btn {
+        border: 0;
+        border-radius: 0;
+        background-color: var(--tg-fill, var(--tg-surface-raised));
+        background-image: none;
+        color: var(--tg-fg, var(--tg-ink));
+        font-family: var(--tg-font-display);
+        transition: transform 80ms steps(2, jump-none);
+    }
+    & .btn:not(.btn-ghost, .btn-link) {
+        --tg-lift: 4px;
+        --tg-drop: var(--tg-shadow);
+    }
+    & .btn:not(.btn-ghost, .btn-link, :disabled, [disabled], .btn-disabled):hover {
+        --tg-lift: 6px;
+        transform: translateY(-2px);
+    }
+    & .btn:not(.btn-ghost, .btn-link, :disabled, [disabled], .btn-disabled):active {
+        --tg-lift: 2px;
+        transform: translateY(2px);
+    }
+
+    & .btn-primary {
+        --tg-fill: var(--tg-gold);
+        --tg-fg: var(--tg-on-gold);
+        --tg-hi: var(--tg-gold-bright);
+        --tg-lo: var(--tg-gold-shade);
+    }
+    & .btn-secondary,
+    & .btn-neutral {
+        --tg-fill: var(--tg-slate);
+        --tg-fg: var(--tg-on-slate);
+    }
+    & .btn-accent {
+        --tg-fill: var(--tg-teal);
+        --tg-fg: var(--tg-on-status);
+    }
+    & .btn-info {
+        --tg-fill: var(--tg-sky);
+        --tg-fg: var(--tg-on-status);
+    }
+    & .btn-success {
+        --tg-fill: var(--tg-jade);
+        --tg-fg: var(--tg-on-status);
+    }
+    & .btn-warning {
+        --tg-fill: var(--tg-amber);
+        --tg-fg: var(--tg-on-status);
+    }
+    & .btn-error {
+        --tg-fill: var(--tg-vermilion);
+        --tg-fg: var(--tg-on-status);
+    }
+
+    /* Ghost: no edge, no depth; a flat sunken fill on hover. */
+    & .btn-ghost {
+        background-color: transparent;
+        color: inherit;
+        box-shadow: none;
+    }
+    & .btn-ghost:not(:disabled, [disabled], .btn-disabled):hover {
+        background-color: var(--tg-surface-sunken);
+    }
+
+    /* Disabled: flat, sunken, faint edge, muted text. */
+    & .btn:is(:disabled, [disabled], .btn-disabled) {
+        --tg-fill: var(--tg-surface-sunken);
+        --tg-fg: var(--tg-ink-muted);
+        --tg-edge: var(--tg-line);
+        --tg-hi: transparent;
+        --tg-lo: transparent;
+        --tg-lift: 0px;
+        --tg-drop: transparent;
+        transform: none;
+        cursor: not-allowed;
+    }
+    & .btn-ghost:is(:disabled, [disabled], .btn-disabled) {
+        background-color: transparent;
+        color: var(--tg-ink-muted);
+    }
+}
+
+/* Fields */
+
+[data-theme^="traveler-gilded"] {
+    & :is(.input, .select, .textarea) {
+        --tg-hi: var(--tg-line);
+        background-color: var(--tg-surface-raised);
+        color: var(--tg-ink);
+        font-family: var(--tg-font-text);
+    }
+    & :is(.input, .textarea)::placeholder,
+    & .input input::placeholder {
+        color: var(--tg-ink-muted);
+        opacity: 1;
+    }
+    & :is(.input, .select, .textarea):is(:focus, :focus-within) {
+        outline: 2px solid var(--tg-focus);
+        outline-offset: 4px;
+    }
+    & :is(.input, .select, .textarea):is(:disabled, [disabled]),
+    & fieldset:disabled :is(.input, .select, .textarea) {
+        --tg-edge: var(--tg-line);
+        --tg-hi: transparent;
+        background-color: var(--tg-surface-sunken);
+        color: var(--tg-ink-muted);
+        cursor: not-allowed;
+    }
+    & .select {
+        background:
+            var(--tg-chevron) right 12px center / 10px 6px no-repeat,
+            var(--tg-surface-raised);
+    }
+    & .select:is(:disabled, [disabled]),
+    & fieldset:disabled .select {
+        background:
+            var(--tg-chevron) right 12px center / 10px 6px no-repeat,
+            var(--tg-surface-sunken);
+    }
+
+    /* Checkbox: a square box; checked is gold with a pixel check. */
+    & .checkbox {
+        --tg-hi: var(--tg-line);
+        position: relative;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        background-color: var(--tg-surface-raised);
+        background-image: none;
+    }
+    & .checkbox::before {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        width: auto;
+        height: auto;
+        opacity: 0;
+        rotate: none;
+        translate: none;
+        clip-path: none;
+        box-shadow: none;
+        transition: none;
+        background-color: var(--tg-on-gold);
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 8 8%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%227%22 y=%221%22 width=%221%22 height=%221%22/%3E%3Crect x=%226%22 y=%222%22 width=%222%22 height=%221%22/%3E%3Crect x=%220%22 y=%223%22 width=%221%22 height=%221%22/%3E%3Crect x=%225%22 y=%223%22 width=%222%22 height=%221%22/%3E%3Crect x=%220%22 y=%224%22 width=%222%22 height=%221%22/%3E%3Crect x=%224%22 y=%224%22 width=%222%22 height=%221%22/%3E%3Crect x=%221%22 y=%225%22 width=%224%22 height=%221%22/%3E%3Crect x=%222%22 y=%226%22 width=%222%22 height=%221%22/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 8 8%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%227%22 y=%221%22 width=%221%22 height=%221%22/%3E%3Crect x=%226%22 y=%222%22 width=%222%22 height=%221%22/%3E%3Crect x=%220%22 y=%223%22 width=%221%22 height=%221%22/%3E%3Crect x=%225%22 y=%223%22 width=%222%22 height=%221%22/%3E%3Crect x=%220%22 y=%224%22 width=%222%22 height=%221%22/%3E%3Crect x=%224%22 y=%224%22 width=%222%22 height=%221%22/%3E%3Crect x=%221%22 y=%225%22 width=%224%22 height=%221%22/%3E%3Crect x=%222%22 y=%226%22 width=%222%22 height=%221%22/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+    }
+    & .checkbox:is(:checked, [aria-checked="true"]) {
+        --tg-hi: var(--tg-gold-bright);
+        background-color: var(--tg-gold);
+    }
+    & .checkbox:is(:checked, [aria-checked="true"])::before {
+        opacity: 1;
+    }
+    & .checkbox:disabled {
+        --tg-edge: var(--tg-line);
+        --tg-hi: transparent;
+        background-color: var(--tg-surface-sunken);
+        opacity: 1;
+    }
+    & .checkbox:disabled::before {
+        background-color: var(--tg-ink-muted);
+    }
+
+    /* Switch: a square knob that moves in steps. */
+    & .toggle {
+        width: 40px;
+        height: 20px;
+        padding: 2px;
+        background-color: var(--tg-surface-sunken);
+        color: var(--tg-ink);
+        transition: grid-template-columns 120ms steps(4, jump-none);
+    }
+    & .toggle::before {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        background-color: currentColor;
+        background-image: none;
+        outline: none;
+        transition: none;
+    }
+    & .toggle:is(:checked, [aria-checked="true"], :has(> input:checked)) {
+        --tg-hi: var(--tg-gold-bright);
+        background-color: var(--tg-gold);
+        color: var(--tg-on-gold);
+    }
+    & .toggle:disabled {
+        --tg-edge: var(--tg-line);
+        --tg-hi: transparent;
+        background-color: var(--tg-surface-sunken);
+        color: var(--tg-ink-muted);
+        opacity: 1;
+    }
+    & .toggle:disabled::before {
+        border: 0;
+        background-color: currentColor;
+    }
+}
+
+/* Tags (badges): 12px capitals, a sunken ground, toned by status. */
+
+[data-theme^="traveler-gilded"] {
+    & .badge {
+        height: auto;
+        min-height: 20px;
+        padding: 0 8px;
+        background-color: var(--tg-surface-sunken);
+        background-image: none;
+        color: var(--tg-ink);
+        font: var(--tg-label-weight) 12px/16px var(--tg-font-label);
+        letter-spacing: var(--tg-label-track);
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    & .badge-primary,
+    & .badge.hover\:badge-primary:hover {
+        background-color: var(--tg-gold);
+        color: var(--tg-on-gold);
+    }
+    & .badge-neutral,
+    & .badge-secondary {
+        background-color: var(--tg-slate);
+        color: var(--tg-on-slate);
+    }
+    & .badge-success {
+        --tg-edge: var(--tg-jade);
+        background-color: var(--tg-jade-soft);
+        color: var(--tg-jade);
+    }
+    & .badge-info {
+        --tg-edge: var(--tg-sky);
+        background-color: var(--tg-sky-soft);
+        color: var(--tg-sky);
+    }
+    & .badge-warning {
+        --tg-edge: var(--tg-amber);
+        background-color: var(--tg-amber-soft);
+        color: var(--tg-amber);
+    }
+    & .badge-error {
+        --tg-edge: var(--tg-vermilion);
+        background-color: var(--tg-vermilion-soft);
+        color: var(--tg-vermilion);
+    }
+    & .badge-accent {
+        --tg-edge: var(--tg-teal);
+        background-color: var(--tg-teal-soft);
+        color: var(--tg-teal);
+    }
+
+    /* A badge on a <code> is inline code: the code ground, no edge. */
+    & code.badge {
+        min-height: 0;
+        padding: 0 4px;
+        background-color: var(--tg-surface-code);
+        color: var(--tg-ink);
+        box-shadow: none;
+        font: 400 0.875em/1.4 var(--tg-font-code);
+        letter-spacing: 0;
+        text-transform: none;
+    }
+}
+
+/* Tabs: a 2px rule under the bar; the current tab is a gold fill. */
+
+[data-theme^="traveler-gilded"] {
+    & .tabs {
+        gap: 8px;
+        padding: 0 8px;
+        border: 0;
+        box-shadow: inset 0 -2px 0 0 var(--tg-outline);
+    }
+    & .tabs > .tab {
+        height: 36px;
+        margin: 2px 2px 0;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        color: var(--tg-ink-muted);
+        font: var(--tg-label-weight) 12px/16px var(--tg-font-label);
+        letter-spacing: var(--tg-label-track);
+        text-transform: uppercase;
+    }
+    & .tabs > .tab::before,
+    & .tabs > .tab::after {
+        display: none;
+    }
+    & .tabs > .tab:hover {
+        color: var(--tg-ink);
+    }
+    & .tabs > .tab:is(.tab-active, [aria-selected="true"]) {
+        --tg-hi: var(--tg-gold-bright);
+        background-color: var(--tg-gold);
+        color: var(--tg-on-gold);
+    }
+}
+
+/* Alerts are callouts: flat (no float), a toned frame on a tinted sheet. */
+
+[data-theme^="traveler-gilded"] {
+    & .alert {
+        color: var(--tg-ink);
+    }
+    & .alert-info {
+        --tg-frame: var(--tg-sky);
+        --tg-sheet: var(--tg-sky-soft);
+    }
+    & .alert-success {
+        --tg-frame: var(--tg-jade);
+        --tg-sheet: var(--tg-jade-soft);
+    }
+    & .alert-warning {
+        --tg-frame: var(--tg-amber);
+        --tg-sheet: var(--tg-amber-soft);
+    }
+    & .alert-error {
+        --tg-frame: var(--tg-vermilion);
+        --tg-sheet: var(--tg-vermilion-soft);
+    }
+    /* --tg-frame is not inherited, so the icon takes its tone directly. */
+    & .alert > svg {
+        color: var(--tg-ink);
+    }
+    & .alert-info > svg {
+        color: var(--tg-sky);
+    }
+    & .alert-success > svg {
+        color: var(--tg-jade);
+    }
+    & .alert-warning > svg {
+        color: var(--tg-amber);
+    }
+    & .alert-error > svg {
+        color: var(--tg-vermilion);
+    }
+}
+
+/* Stats */
+
+[data-theme^="traveler-gilded"] {
+    & .stat {
+        border: 0;
+    }
+    & .stats-horizontal .stat:not(:last-child) {
+        border: 0;
+        background: repeating-conic-gradient(var(--tg-line) 0% 25%, transparent 0% 50%) right top / 4px 4px repeat-y;
+    }
+    & .stat-title {
+        color: var(--tg-ink-muted);
+        font: var(--tg-label-weight) 12px/16px var(--tg-font-label);
+        letter-spacing: var(--tg-label-track);
+        text-transform: uppercase;
+    }
+    & .stat-value {
+        font-family: var(--tg-font-display);
+        font-weight: 700;
+    }
+}
+
+/* Progress: a segmented track; filled segments take the outline colour. */
+
+[data-theme^="traveler-gilded"] {
+    & .progress {
+        height: 16px;
+        color: var(--tg-outline);
+        background: repeating-linear-gradient(90deg, var(--tg-surface-sunken) 0 10px, var(--tg-surface-raised) 10px 12px);
+    }
+    & .progress-success {
+        color: var(--tg-jade);
+    }
+    & .progress-info {
+        color: var(--tg-sky);
+    }
+    & .progress-warning {
+        color: var(--tg-amber);
+    }
+    & .progress-error {
+        color: var(--tg-vermilion);
+    }
+    & .progress::-webkit-progress-bar {
+        border-radius: 0;
+        background: transparent;
+    }
+    & .progress::-webkit-progress-value {
+        border-radius: 0;
+        background: repeating-linear-gradient(90deg, currentColor 0 10px, transparent 10px 12px);
+    }
+    & .progress::-moz-progress-bar {
+        border-radius: 0;
+        background: repeating-linear-gradient(90deg, currentColor 0 10px, transparent 10px 12px);
+    }
+}
+
+/* Divider: a dither rule, decoration only. */
+
+[data-theme^="traveler-gilded"] {
+    & .divider::before,
+    & .divider::after {
+        height: 4px;
+        background: repeating-conic-gradient(var(--tg-line) 0% 25%, transparent 0% 50%) 0 0 / 4px 4px;
+    }
+}
+
+/* Code block: slate ground, square window dots. */
+
+[data-theme^="traveler-gilded"] {
+    & .mockup-code {
+        background-color: var(--tg-slate);
+        color: var(--tg-on-slate);
+        font-family: var(--tg-font-code);
+    }
+    & .mockup-code::before {
+        width: 8px;
+        height: 8px;
+        border-radius: 0;
+        opacity: 1;
+        color: var(--tg-on-slate-muted);
+        background-color: transparent;
+        box-shadow: 20px 0 0 0 currentColor, 36px 0 0 0 currentColor, 52px 0 0 0 currentColor;
+    }
+}
+
+/* Menus: square rows, a flat hover, gold for the current item. */
+
+[data-theme^="traveler-gilded"] {
+    & .menu li > :is(button, a, summary) {
+        border-radius: 0;
+    }
+    & .menu li > :is(button, a, summary):not(.menu-active):hover {
+        background-color: var(--tg-surface-sunken);
+        box-shadow: none;
+    }
+    & .menu li > :is(button, a, summary).menu-active {
+        background-color: var(--tg-gold);
+        color: var(--tg-on-gold);
+    }
+}
+
+/* Modal: the page behind is dithered, not dimmed. */
+
+[data-theme^="traveler-gilded"] .modal:is(.modal-open, [open], :target) {
+    background-color: transparent;
+    background-image: repeating-conic-gradient(var(--tg-shadow) 0% 25%, transparent 0% 50%);
+    background-size: 4px 4px;
+}
+
+/* Loading: a three-cell snake stepping round a pixel ring. */
+
+[data-theme^="traveler-gilded"] .loading-spinner {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 8%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%220%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%220%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%220%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2211%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%228%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%228%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2222%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2219%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2216%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2230%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2230%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2227%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2238%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2238%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2238%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2243%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2246%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2246%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2248%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2251%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2254%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2256%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2256%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2259%22 y=%226%22 width=%222%22 height=%222%22/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 8%22 shape-rendering=%22crispEdges%22%3E%3Crect x=%220%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%220%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%220%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2211%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%228%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%228%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2222%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2219%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2216%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2230%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2230%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2227%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2238%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2238%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2238%22 y=%220%22 width=%222%22 height=%222%22/%3E%3Crect x=%2243%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2246%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2246%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2248%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2251%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2254%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2256%22 y=%223%22 width=%222%22 height=%222%22/%3E%3Crect x=%2256%22 y=%226%22 width=%222%22 height=%222%22/%3E%3Crect x=%2259%22 y=%226%22 width=%222%22 height=%222%22/%3E%3C/svg%3E");
+    -webkit-mask-size: 800% 100%;
+    mask-size: 800% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 0% 0;
+    mask-position: 0% 0;
+    animation: tg-spin 800ms steps(8, jump-none) infinite;
+}
+@keyframes tg-spin {
+    from {
+        -webkit-mask-position: 0% 0;
+        mask-position: 0% 0;
+    }
+    to {
+        -webkit-mask-position: 100% 0;
+        mask-position: 100% 0;
+    }
+}
+
+/* Title bar: the slate chrome. Its dropdowns go back to the page colours. */
+
+[data-theme^="traveler-gilded"] {
+    & .app-titlebar {
+        --color-base-100: var(--tg-slate);
+        --color-base-content: var(--tg-on-slate);
+        background-color: var(--tg-slate);
+        color: var(--tg-on-slate);
+        box-shadow: 0 2px 0 0 var(--tg-outline);
+    }
+    & .app-titlebar .text-primary {
+        color: var(--tg-gold-bright);
+    }
+    & .app-titlebar :focus-visible {
+        outline-color: var(--tg-gold-bright);
+    }
+    & .app-titlebar .btn-ghost:not(:disabled, [disabled], .btn-disabled):hover {
+        background-color: transparent;
+        color: var(--tg-gold-bright);
+    }
+    & .app-titlebar .dropdown-content {
+        --color-base-100: var(--tg-surface-raised);
+        --color-base-200: var(--tg-surface);
+        --color-base-300: var(--tg-surface-sunken);
+        --color-base-content: var(--tg-ink);
+        color: var(--tg-ink);
+    }
+    & .app-titlebar .dropdown-content :focus-visible {
+        outline-color: var(--tg-focus);
+    }
+}
+
+/* Type scale. Tailwind's size steps are remapped so the markup's text-*
+   classes land on the system's styles: nothing below 14px except capital
+   labels, text-lg is subheading. */
+
+[data-theme^="traveler-gilded"] {
+    --text-xs: 14px; /* small */
+    --text-xs--line-height: 20px;
+    --text-sm: 14px; /* small */
+    --text-sm--line-height: 20px;
+    --text-base: 16px; /* body */
+    --text-base--line-height: 24px;
+    --text-lg: 20px; /* subheading */
+    --text-lg--line-height: 24px;
+
+    /* Field text is body (16px); a text-sm utility on a code field keeps 14px. */
+    & :is(.input, .select, .textarea) {
+        --font-size-min: 16px;
+    }
+    /* DaisyUI sets 12px on the whole fieldset. */
+    & .fieldset {
+        font-size: 14px;
+        line-height: 20px;
+    }
+    /* Field labels are control: 16px semi-bold ink. */
+    & .label {
+        color: var(--tg-ink);
+        font: 600 16px/24px var(--tg-font-display);
+    }
+    & .card-title {
+        font-size: 20px;
+        line-height: 24px;
+    }
+    /* Dialog titles are heading. */
+    & .modal-box :is(h1, h2, h3) {
+        font-family: var(--tg-font-display);
+        font-size: 24px;
+        line-height: 28px;
+        font-weight: 700;
+    }
+    /* Stat values are stat: 32px bold. */
+    & .stat-value {
+        font-size: 32px;
+        line-height: 36px;
+    }
+    /* Language codes in the language menu are capital labels. */
+    & .text-\[\.5625rem\] {
+        font: var(--tg-label-weight) 12px/16px var(--tg-font-label);
+        letter-spacing: var(--tg-label-track);
+        text-transform: uppercase;
+    }
+    /* Native language names stay in the theme face, never a smooth one in pixel mode. */
+    & .font-\[sans-serif\] {
+        font-family: inherit;
+    }
+
+    /* Buttons: 40px (16px label), sm 28px (14px label). */
+    & .btn {
+        --fontsize: 16px;
+    }
+    & .btn-sm {
+        --size: 28px;
+        --fontsize: 14px;
+    }
+    & .btn-xs {
+        --fontsize: 14px;
+    }
+}
+
+/* Nothing is translucent: faded text becomes a flat muted colour, faded
+   fills become flat fills. */
+
+[data-theme^="traveler-gilded"] {
+    & :is(.opacity-40, .opacity-60, .opacity-70) {
+        opacity: 1;
+        color: var(--tg-ink-muted);
+    }
+    & .app-titlebar .btn:is(.opacity-40, .opacity-60, .opacity-70) {
+        color: var(--tg-on-slate-muted);
+    }
+    & .app-titlebar .w-px.bg-base-content\/10 {
+        width: 2px;
+        background-color: var(--tg-on-slate-muted);
+    }
+    & .app-titlebar .hover\:bg-base-content\/10:hover {
+        background-color: transparent;
+        color: var(--tg-gold-bright);
+    }
+    & .menu :is(.menu-disabled, [disabled]) {
+        color: var(--tg-ink-disabled);
+    }
+}
+
+/* Motion: things appear in one step, never fade or ease in. */
+
+[data-theme^="traveler-gilded"] {
+    & .modal,
+    & .modal-box,
+    & .dropdown .dropdown-content,
+    & .menu li > *,
+    & .transition-colors {
+        transition: none;
+        animation: none;
+    }
+    & .modal:is(.modal-open, [open], :target) > .modal-box {
+        opacity: 1;
+        scale: 1;
+        translate: 0;
+    }
+}
+
+/* Icons: the pixel set replaces the smooth one. */
+
+[data-theme^="traveler-gilded"] {
+    & .app-icon-smooth {
+        display: none;
+    }
+    & .app-icon-pixel {
+        display: inline-block;
+        flex: none;
+        vertical-align: middle;
+    }
+}
+
+/* Status icons on the slate title bar take the light (Night) hues, which
+   are drawn for dark grounds; neutral becomes on-slate-muted. */
+[data-theme^="traveler-gilded"] .app-titlebar .app-icon-pixel {
+    &.text-success {
+        color: #86d396;
+    }
+    &.text-error {
+        color: #f29076;
+    }
+    &.text-warning {
+        color: #ecbd4f;
+    }
+    &.text-neutral {
+        color: var(--tg-on-slate-muted);
+    }
+}
+
+/* Tooltip: a slate bubble on the pixel edge with a hard float shadow, and a
+   stepped arrow (8px then 4px rows) pointing at the element. */
+
+[data-theme^="traveler-gilded"] .app-tooltip {
+    border-radius: 0;
+    padding: 4px 8px;
+    background-color: var(--tg-slate);
+    color: var(--tg-on-slate);
+    font: 400 14px/20px var(--tg-font-text);
+    box-shadow:
+        0 -2px 0 0 var(--tg-outline),
+        0 2px 0 0 var(--tg-outline),
+        -2px 0 0 0 var(--tg-outline),
+        2px 0 0 0 var(--tg-outline),
+        4px 4px 0 0 var(--tg-shadow);
+
+    &::before,
+    &::after {
+        content: "";
+        position: absolute;
+        left: var(--arrow-x, 50%);
+        height: 2px;
+        background: var(--tg-outline);
+    }
+    &::before {
+        width: 8px;
+        margin-left: -4px;
+    }
+    &::after {
+        width: 4px;
+        margin-left: -2px;
+    }
+    &[data-placement="top"]::before {
+        top: calc(100% + 2px);
+    }
+    &[data-placement="top"]::after {
+        top: calc(100% + 4px);
+    }
+    &[data-placement="bottom"]::before {
+        bottom: calc(100% + 2px);
+    }
+    &[data-placement="bottom"]::after {
+        bottom: calc(100% + 4px);
+    }
+}
+
+/* Motion moves in steps; none at all when people ask for less. */
+
+@media (prefers-reduced-motion: reduce) {
+    [data-theme^="traveler-gilded"] {
+        & .btn,
+        & .toggle {
+            transition: none;
+        }
+        & .loading-spinner {
+            animation: none;
+        }
+    }
+}

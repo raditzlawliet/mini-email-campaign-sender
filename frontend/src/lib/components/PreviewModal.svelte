@@ -1,4 +1,5 @@
 <script>
+    import Icon from "./Icon.svelte";
     import { X, ChevronLeft, ChevronRight } from "@lucide/svelte";
     import { t } from "../i18n.svelte.js";
 
@@ -31,7 +32,7 @@
                 <button
                     class="btn btn-sm btn-circle btn-ghost"
                     onclick={onclose}
-                    aria-label={t("close")}><X class="w-4 h-4" /></button
+                    aria-label={t("close")}><Icon pixel="close" smooth={X} size={12} class="w-4 h-4" /></button
                 >
             </div>
 
@@ -50,7 +51,7 @@
                             class="btn btn-sm btn-outline"
                             onclick={prev}
                             disabled={current === 0}
-                            ><ChevronLeft class="w-4 h-4" /></button
+                            ><Icon pixel="chevron-left" smooth={ChevronLeft} size={12} class="w-4 h-4" /></button
                         >
                         <span class="text-sm mx-1"
                             >{current + 1} of {previews.length}</span
@@ -59,7 +60,7 @@
                             class="btn btn-sm btn-outline"
                             onclick={next}
                             disabled={current === previews.length - 1}
-                            ><ChevronRight class="w-4 h-4" /></button
+                            ><Icon pixel="chevron-right" smooth={ChevronRight} size={12} class="w-4 h-4" /></button
                         >
                     </div>
                     <div role="tablist" class="tabs tabs-bordered">

@@ -1,6 +1,10 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
 import "./app.css";
+import { applyTheme } from "./lib/theme.js";
+
+// Follow the OS until the saved theme loads, so there is no flash.
+applyTheme("");
 
 // Wails' built-in edge resize breaks when a DOM scrollbar occupies the window
 // edge (the 6px resize zone is swallowed by the scrollbar strip). Window

@@ -1,4 +1,5 @@
 <script>
+    import Icon from "./Icon.svelte";
     import { t } from "../i18n.svelte.js";
 
     let {
@@ -51,19 +52,21 @@
 
         {#if useTemplate}
             <div class="alert alert-info text-sm">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    class="stroke-current shrink-0 w-5 h-5"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    ></path>
-                </svg>
+                <Icon pixel="info">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        class="stroke-current shrink-0 w-5 h-5"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        ></path>
+                    </svg>
+                </Icon>
                 <span>
                     {t("ses_template_info")}
                 </span>
@@ -88,7 +91,7 @@
                     <button
                         class="btn btn-ghost btn-xs"
                         onclick={() => (bodyPreviewOpen = true)}
-                        title={t("preview")}>{t("preview")}</button
+                        >{t("preview")}</button
                     >
                 </div>
                 <textarea
@@ -113,7 +116,8 @@
                 <button
                     class="btn btn-sm btn-circle btn-ghost"
                     onclick={() => (bodyPreviewOpen = false)}
-                    aria-label={t("close")}>✕</button
+                    aria-label={t("close")}
+                    ><Icon pixel="close" size={12}>✕</Icon></button
                 >
             </div>
             {#if _body}

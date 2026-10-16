@@ -1,5 +1,6 @@
 <script>
     import { t } from "../i18n.svelte.js";
+    import { tooltip } from "../tooltip.js";
     import { PickCSVFile, ParseCSVFile } from "../wailsjs/go/app/App";
 
     let {
@@ -159,7 +160,7 @@
                     <button
                         class="badge badge-outline cursor-pointer hover:badge-primary transition-colors"
                         onclick={() => copyHeader(h)}
-                        title="Click to copy {'{' + h + '}'}"
+                        use:tooltip={`Click to copy {${h}}`}
                     >
                         {h}
                     </button>

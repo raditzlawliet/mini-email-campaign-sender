@@ -20,7 +20,7 @@ Desktop app (Wails v2) to send personalized email campaigns via SMTP or Amazon S
 - **Campaign logging** — optional per-run JSON log file with full configuration and delivery tracking
 - **Verbose mode** — per-email debug details in frontend and log file
 - **Multi-language** — English, Arabic (RTL), and Bahasa Indonesia
-- **Theme picker** — choose from all DaisyUI themes, auto-persisted to your config
+- **Theme picker** — choose from all DaisyUI themes plus the pixel-art Traveler Gilded themes (Day, Night, Pixel Day, Pixel Night). Until you pick one, the theme follows the OS: Traveler Gilded Night when dark, Day when light. Your pick is auto-persisted to your config and always used
 - **Secure credentials** — SMTP and SES credentials automatically stored in OS keyring
 - **MCP server (AI agents)** — embedded Model Context Protocol server on localhost so AI agents can prepare, dry-run, start, pause, resume, monitor, and clear campaigns (see [MCP Server](#mcp-server-ai-agents))
 

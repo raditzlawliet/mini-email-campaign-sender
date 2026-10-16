@@ -1,5 +1,5 @@
 app:
-  theme: dark
+  theme: "" # empty: follow the OS (Traveler Gilded Night when dark, Day when light)
   language: en
 
 email:

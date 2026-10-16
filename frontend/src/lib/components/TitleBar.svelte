@@ -1,4 +1,5 @@
 <script>
+    import Icon from "./Icon.svelte";
     import { onMount } from "svelte";
     import {
         Mail,
@@ -28,12 +29,18 @@
     } from "../wailsjs/go/app/App";
     import { t, setLanguage, getLanguage, LANGS } from "../i18n.svelte.js";
     import McpConfig from "./McpConfig.svelte";
+    import { tooltip } from "../tooltip.js";
+    import { applyTheme } from "../theme.js";
     import { app } from "../wailsjs/go/models";
 
     const REPO_URL =
         "https://github.com/raditzlawliet/mini-email-campaign-sender";
 
     const THEMES = [
+        "traveler-gilded-day",
+        "traveler-gilded-night",
+        "traveler-gilded-pixel-day",
+        "traveler-gilded-pixel-night",
         "dark",
         "light",
         "cupcake",
@@ -68,9 +75,18 @@
         "sunset",
     ];
 
+    // Display names for themes whose id doesn't read well capitalized.
+    const THEME_LABELS = {
+        "traveler-gilded-day": "Traveler Gilded (Day)",
+        "traveler-gilded-night": "Traveler Gilded (Night)",
+        "traveler-gilded-pixel-day": "Traveler Gilded (Pixel Day)",
+        "traveler-gilded-pixel-night": "Traveler Gilded (Pixel Night)",
+    };
+
     let isMaximized = $state(false);
     let appVersion = $state("dev");
-    let currentTheme = $state("dark");
+    // "" until a theme is chosen: the theme then follows the OS.
+    let currentTheme = $state("");
     let themeDropdownOpen = $state(false);
     let langDropdownOpen = $state(false);
     let langRef = $state(null);
@@ -204,7 +220,7 @@
 
     function selectTheme(theme) {
         currentTheme = theme;
-        document.documentElement.dataset.theme = theme;
+        applyTheme(theme);
         themeDropdownOpen = false;
         persistTheme(theme);
     }
@@ -232,10 +248,10 @@
         (async () => {
             try {
                 const data = await GetCampaignConfig();
-                const theme = data?.app?.theme || "dark";
+                const theme = data?.app?.theme || "";
                 const lang = data?.app?.language || "en";
                 currentTheme = theme;
-                document.documentElement.dataset.theme = currentTheme;
+                applyTheme(currentTheme);
                 setLanguage(lang);
                 mcpEnabled = data?.mcp?.enabled ?? true;
                 mcpHost = data?.mcp?.host || "127.0.0.1";
@@ -247,7 +263,8 @@
                 mcpAddr = data?.mcp?.addr || "";
                 mcpError = data?.mcp?.error || "";
             } catch {
-                currentTheme = "dark";
+                currentTheme = "";
+                applyTheme(currentTheme);
                 setLanguage("en");
             }
             try {
@@ -267,7 +284,7 @@
 
 <header
     dir="ltr"
-    class="fixed inset-x-0 top-0 z-50 flex h-8 select-none items-stretch bg-base-100 shadow-sm"
+    class="app-titlebar fixed inset-x-0 top-0 z-50 flex h-8 select-none items-stretch bg-base-100 shadow-sm"
 >
     <!-- Drag region: title + version -->
     <div
@@ -277,7 +294,13 @@
         ondblclick={toggleMaximize}
         class="flex min-w-0 flex-1 cursor-default items-center px-2"
     >
-        <Mail class="size-4 shrink-0 text-primary me-2"></Mail>
+        <Icon
+            pixel="mail"
+            smooth={Mail}
+            size={12}
+            class="size-4 shrink-0 text-primary me-2"
+            pixelClass="text-primary me-2"
+        />
         <span class="truncate text-sm font-bold tracking-wide"
             >{t("window_title")}</span
         >
@@ -285,7 +308,7 @@
             style="--wails-draggable: no-drag"
             onclick={() => openExternal(REPO_URL + "/releases")}
             class="btn btn-ghost btn-xs shrink-0 font-mono text-xs opacity-60 hover:opacity-100"
-            title={t("view_releases")}
+            use:tooltip={t("view_releases")}
         >
             {appVersion}
         </button>
@@ -302,14 +325,14 @@
             <button
                 class="btn btn-ghost btn-sm gap-1 px-2 font-bold"
                 aria-label={t("change_language")}
-                title={t("change_language")}
+                use:tooltip={t("change_language")}
                 onclick={toggleLang}
             >
-                <GlobeIcon class="size-4"></GlobeIcon>
+                <Icon pixel="globe" smooth={GlobeIcon} size={12} />
                 {#if langDropdownOpen}
-                    <ChevronUp class="size-3.5" />
+                    <Icon pixel="chevron-up" smooth={ChevronUp} size={12} class="size-3.5" />
                 {:else}
-                    <ChevronDown class="size-3.5" />
+                    <Icon pixel="chevron-down" smooth={ChevronDown} size={12} class="size-3.5" />
                 {/if}
             </button>
             {#if langDropdownOpen}
@@ -359,14 +382,14 @@
                     <div class="bg-accent size-1 rounded-full"></div>
                 </div>
                 {#if themeDropdownOpen}
-                    <ChevronUp class="size-3.5" />
+                    <Icon pixel="chevron-up" smooth={ChevronUp} size={12} class="size-3.5" />
                 {:else}
-                    <ChevronDown class="size-3.5" />
+                    <Icon pixel="chevron-down" smooth={ChevronDown} size={12} class="size-3.5" />
                 {/if}
             </button>
             {#if themeDropdownOpen}
                 <div
-                    class="dropdown-content bg-base-200 rounded-box z-1 w-48 shadow-2xl max-h-80 overflow-y-auto"
+                    class="dropdown-content bg-base-200 rounded-box z-1 w-72 shadow-2xl max-h-80 overflow-y-auto"
                 >
                     <ul class="menu menu-sm w-full">
                         {#each THEMES as tm}
@@ -394,7 +417,7 @@
                                             class="bg-accent size-1 rounded-full"
                                         ></div>
                                     </div>
-                                    <span>{tm}</span>
+                                    <span>{THEME_LABELS[tm] ?? tm}</span>
                                 </button>
                             </li>
                         {/each}
@@ -412,11 +435,14 @@
             <button
                 class="btn btn-ghost btn-sm gap-1 px-2"
                 aria-label={t("mcp_settings")}
-                title={t("mcp_settings")}
+                use:tooltip={t("mcp_settings")}
                 onclick={toggleMcp}
             >
-                <Bot class="size-4"></Bot>
-                <CircleIcon
+                <Icon pixel="bot" smooth={Bot} size={12} />
+                <Icon
+                    pixel="dot"
+                    smooth={CircleIcon}
+                    size={12}
                     class="size-2 {mcpStatus === 'running'
                         ? 'fill-success'
                         : mcpStatus === 'error'
@@ -424,11 +450,18 @@
                           : mcpStatus === 'starting'
                             ? 'fill-warning'
                             : 'fill-neutral'}"
-                ></CircleIcon>
+                    pixelClass={mcpStatus === 'running'
+                        ? 'text-success'
+                        : mcpStatus === 'error'
+                          ? 'text-error'
+                          : mcpStatus === 'starting'
+                            ? 'text-warning'
+                            : 'text-neutral'}
+                />
                 {#if mcpDropdownOpen}
-                    <ChevronUp class="size-3.5" />
+                    <Icon pixel="chevron-up" smooth={ChevronUp} size={12} class="size-3.5" />
                 {:else}
-                    <ChevronDown class="size-3.5" />
+                    <Icon pixel="chevron-down" smooth={ChevronDown} size={12} class="size-3.5" />
                 {/if}
             </button>
             {#if mcpDropdownOpen}
@@ -457,19 +490,21 @@
         <button
             onclick={() => openExternal(REPO_URL)}
             class="btn btn-ghost btn-sm px-2"
-            title={t("github_repository")}
+            use:tooltip={t("github_repository")}
             aria-label={t("github_repository")}
         >
-            <svg
-                class="size-4"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-                <path
-                    d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z"
-                />
-            </svg>
+            <Icon pixel="github" size={12}>
+                <svg
+                    class="size-4"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z"
+                    />
+                </svg>
+            </Icon>
         </button>
 
         <div class="my-1.5 w-px bg-base-content/10"></div>
@@ -479,32 +514,34 @@
             <button
                 class="flex w-10 items-center justify-center hover:bg-base-content/10"
                 aria-label={t("window_minimize")}
-                title={t("window_minimize")}
+                use:tooltip={t("window_minimize")}
                 onclick={minimize}
             >
-                <Minus class="size-4"></Minus>
+                <Icon pixel="minimize" smooth={Minus} size={12} />
             </button>
             <button
                 class="flex w-10 items-center justify-center hover:bg-base-content/10"
                 aria-label={isMaximized
                     ? t("window_restore")
                     : t("window_maximize")}
-                title={isMaximized ? t("window_restore") : t("window_maximize")}
+                use:tooltip={isMaximized
+                    ? t("window_restore")
+                    : t("window_maximize")}
                 onclick={toggleMaximize}
             >
                 {#if isMaximized}
-                    <Copy class="size-3.5"></Copy>
+                    <Icon pixel="restore" smooth={Copy} size={12} class="size-3.5" />
                 {:else}
-                    <Square class="size-3.5"></Square>
+                    <Icon pixel="maximize" smooth={Square} size={12} class="size-3.5" />
                 {/if}
             </button>
             <button
                 class="flex w-10 items-center justify-center hover:bg-error hover:text-error-content"
                 aria-label={t("window_close")}
-                title={t("window_close")}
+                use:tooltip={t("window_close")}
                 onclick={closeApp}
             >
-                <X class="size-4"></X>
+                <Icon pixel="close" smooth={X} size={12} />
             </button>
         </div>
     </div>

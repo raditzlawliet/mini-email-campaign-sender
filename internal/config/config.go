@@ -536,9 +536,6 @@ func Load(path string) (*Config, error) {
 	tryMigrateSecretsToKeyring(cfg, path)
 
 	// Apply defaults.
-	if cfg.App.Theme == "" {
-		cfg.App.Theme = "dark"
-	}
 	if cfg.App.Language == "" {
 		cfg.App.Language = "en"
 	}

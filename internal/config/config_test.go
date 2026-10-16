@@ -123,7 +123,7 @@ email:
 		cfg, err := Load(path)
 		require.NoError(err)
 
-		assert.Equal("dark", cfg.App.Theme)
+		assert.Empty(cfg.App.Theme, "unset theme follows the OS in the frontend")
 		assert.Equal("en", cfg.App.Language)
 		assert.Equal("smtp", cfg.Email.Provider)
 		assert.Equal(10, cfg.Worker.Concurrency)

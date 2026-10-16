@@ -1,5 +1,6 @@
 <script>
     import { t } from "../i18n.svelte.js";
+    import Select from "./Select.svelte";
 
     let {
         provider = $bindable("smtp"),
@@ -25,15 +26,15 @@
 <div>
     <fieldset class="fieldset">
         <label class="label" for="cfg-provider">{t("provider")}</label>
-        <select
+        <Select
             id="cfg-provider"
-            class="select w-full"
+            options={[
+                { value: "smtp", label: t("smtp") },
+                { value: "ses", label: t("amazon_ses") },
+            ]}
             bind:value={provider}
             {disabled}
-        >
-            <option value="smtp">{t("smtp")}</option>
-            <option value="ses">{t("amazon_ses")}</option>
-        </select>
+        />
     </fieldset>
 
     <fieldset class="fieldset">
